@@ -1,4 +1,4 @@
-import { JSCodeshift, Transform } from "jscodeshift/src/core";
+import { Transform } from "jscodeshift/src/core";
 
 function capitalizeFirstLetter(string: string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -8,19 +8,22 @@ const transform: Transform = (file, api) => {
   const j = api.jscodeshift;
   const { statement } = j.template;
   const root = j(file.source);
-  const objects = root.find(j.CallExpression).filter(p => {
-    const callee = p.value.callee;
-    return (
-      callee.type === "Identifier" &&
-      (callee.name === "objectType" ||
-        callee.name === "interfaceType" ||
-        callee.name === "inputObjectType")
-    );
+
+  const objectTypes = ["objectType", "interfaceType", "inputObjectType"];
+  const objects = root.find(j.CallExpression, {
+    callee: {
+      type: "Identifier",
+      name: (name: string) => objectTypes.includes(name)
+    }
   });
-  const enums = root.find(j.CallExpression).filter(p => {
-    const callee = p.value.callee;
-    return callee.type === "Identifier" && callee.name === "enumType";
+
+  const enums = root.find(j.CallExpression, {
+    callee: {
+      type: "Identifier",
+      name: "enumType"
+    }
   });
+
   const queriesMutations = root.find(j.CallExpression).filter(p => {
     const callee = p.value.callee;
     const functionNames = ["mutationField", "queryField"];
@@ -41,11 +44,30 @@ const transform: Transform = (file, api) => {
     );
   });
   enums.replaceWith(p => {
-    const name = p.value.arguments[0].properties.find(
-      (p: any) => p.key.name === "name"
-    ).value;
+    const callExpression = p.value;
+    const firstArgument = callExpression.arguments[0];
+
+    if (firstArgument?.type !== "ObjectExpression") {
+      console.warn(
+        "Expected ObjectExpression as the first argument of enumType"
+      );
+      return p.value;
+    }
+
+    const name = j(firstArgument)
+      .find(j.ObjectProperty, {
+        key: { type: "Identifier", name: "name" }
+      })
+      .nodes()[0].value;
+
+    const members = j(firstArgument)
+      .find(j.ObjectProperty, {
+        key: { type: "Identifier", name: "members" }
+      })
+      .nodes()[0].value;
+
     return statement`builder.enumType(${name}, {
-  values: ${p.value.arguments[0].properties.find((p: any) => p.key.name === "members").value} as const
+  values: ${members} as const
 })`;
   });
   queriesMutations.replaceWith(p => {
