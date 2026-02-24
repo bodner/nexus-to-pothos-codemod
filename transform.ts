@@ -23,6 +23,10 @@ function getMemberChain(callee) {
   return chain;
 }
 
+function isValidTypeIdentifier(name: string) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name);
+}
+
 const transform: Transform = (file, api) => {
   const j = api.jscodeshift;
   const { statement } = j.template;
@@ -554,8 +558,23 @@ const transform: Transform = (file, api) => {
     if (objectType === "inputType") {
       return statement`builder.${objectType}(${type}, ${j.objectExpression(objectProps)})`;
     }
-    return statement`builder.${objectType}<any>(${type})
+    const refStatement = statement`builder.${objectType}<any>(${type})
   .implement(${j.objectExpression(objectProps)})`;
+    if (type.type === "StringLiteral" && isValidTypeIdentifier(type.value)) {
+      const implementCall = refStatement.expression;
+      if (
+        implementCall?.type === "CallExpression" &&
+        implementCall.callee.type === "MemberExpression" &&
+        implementCall.callee.object.type === "CallExpression" &&
+        implementCall.callee.object.typeParameters?.type ===
+          "TSTypeParameterInstantiation"
+      ) {
+        implementCall.callee.object.typeParameters.params = [
+          j.tsTypeReference(j.identifier(type.value))
+        ];
+      }
+    }
+    return refStatement;
   });
   return root.toSource();
 };

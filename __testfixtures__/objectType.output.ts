@@ -1,4 +1,4 @@
-export const SomeObjectType = builder.objectRef<any>('SomeObjectType')
+export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType')
   .implement({
   interfaces: [SomeType1],
 
@@ -42,7 +42,7 @@ export const SomeObjectType = builder.objectRef<any>('SomeObjectType')
   })
 });
 
-export const Interface = builder.interfaceRef<any>('SomeType1')
+export const Interface = builder.interfaceRef<SomeType1>('SomeType1')
   .implement({
   fields: t => ({
     id: t.id(),
@@ -71,7 +71,7 @@ export const Input = builder.inputType('Input', {
   })
 });
 
-export const RandomObjectType = builder.objectRef<any>('RandomObjectType')
+export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjectType')
   .implement({
   fields: t => ({
     listOfNullableBooleans: t.booleanList({
@@ -95,7 +95,7 @@ export const RandomObjectType = builder.objectRef<any>('RandomObjectType')
   })
 });
 
-export const ListObjectType = builder.objectRef<any>('ListObjectType')
+export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType')
   .implement({
   fields: t => ({
     departments: t.field({
