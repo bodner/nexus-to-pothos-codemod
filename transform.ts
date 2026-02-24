@@ -32,6 +32,308 @@ const transform: Transform = (file, api) => {
   const { statement } = j.template;
   const root = j(file.source);
 
+  const transformArgProperty = p => {
+    const argName = p.key.name;
+    const isNonNullWrapper =
+      p.value?.type === "CallExpression" && p.value.callee?.name === "nonNull";
+    const isNullableWrapper =
+      p.value?.type === "CallExpression" && p.value.callee?.name === "nullable";
+    const params = [];
+    if (isNonNullWrapper) {
+      params.push(
+        j.property("init", j.identifier("required"), j.booleanLiteral(true))
+      );
+    }
+    if (isNullableWrapper) {
+      params.push(
+        j.property("init", j.identifier("required"), j.booleanLiteral(false))
+      );
+    }
+    const val =
+      (isNonNullWrapper || isNullableWrapper) && p.value.arguments?.length
+        ? p.value.arguments[0]
+        : p.value;
+    let newArg;
+    if (val?.type === "Identifier") {
+      params.unshift(j.property("init", j.identifier("type"), val));
+      newArg = j.callExpression(
+        j.memberExpression(j.identifier("t"), j.identifier("arg")),
+        [j.objectExpression(params)]
+      );
+    } else if (val?.type === "ExpressionStatement") {
+      params.unshift(j.property("init", j.identifier("type"), val.expression));
+      newArg = j.callExpression(
+        j.memberExpression(j.identifier("t"), j.identifier("arg")),
+        [j.objectExpression(params)]
+      );
+    } else if (
+      val?.type === "CallExpression" &&
+      val.callee?.type === "Identifier"
+    ) {
+      const type = val.callee.name.match(/[a-z]+/g)?.[0];
+      if (type) {
+        newArg = j.callExpression(
+          j.memberExpression(
+            j.memberExpression(j.identifier("t"), j.identifier("arg")),
+            j.identifier(type)
+          ),
+          params.length ? [j.objectExpression(params)] : []
+        );
+      } else {
+        params.unshift(j.property("init", j.identifier("type"), val));
+        newArg = j.callExpression(
+          j.memberExpression(j.identifier("t"), j.identifier("arg")),
+          [j.objectExpression(params)]
+        );
+      }
+    } else {
+      params.unshift(j.property("init", j.identifier("type"), val));
+      newArg = j.callExpression(
+        j.memberExpression(j.identifier("t"), j.identifier("arg")),
+        [j.objectExpression(params)]
+      );
+    }
+    return j.property("init", j.identifier(argName), newArg);
+  };
+
+  const upsertObjectProperty = (properties, keyName, valueNode) => {
+    const nextProperty = j.property("init", j.identifier(keyName), valueNode);
+    const index = properties.findIndex(
+      property => property.key?.name === keyName
+    );
+    if (index >= 0) {
+      properties[index] = nextProperty;
+    } else {
+      properties.push(nextProperty);
+    }
+  };
+
+  const normalizeFieldType = (typeNode, hasListWrapper) => {
+    let type = typeNode;
+    let required: boolean | null = null;
+    let hasList = hasListWrapper;
+
+    if (type?.type === "CallExpression" && type.callee?.name === "list") {
+      hasList = true;
+      let listItemType = type.arguments[0];
+      if (
+        listItemType?.type === "CallExpression" &&
+        ["nonNull", "nullable"].includes(listItemType.callee?.name)
+      ) {
+        required = listItemType.callee.name === "nonNull";
+        listItemType = listItemType.arguments[0];
+      }
+      type = j.arrayExpression([listItemType]);
+    } else if (hasListWrapper) {
+      type = j.arrayExpression([type]);
+    }
+
+    return {
+      type,
+      hasList,
+      required
+    };
+  };
+
+  const transformRootFieldCall = call => {
+    if (call.callee.type !== "MemberExpression") {
+      return null;
+    }
+
+    const methodChain = getMemberChain(call.callee);
+    const method = methodChain[methodChain.length - 1];
+    const wrappers = methodChain.slice(1, -1);
+    const listIndex = wrappers.indexOf("list");
+    const outerWrappers =
+      listIndex >= 0 ? wrappers.slice(0, listIndex) : wrappers;
+    const innerWrappers = listIndex >= 0 ? wrappers.slice(listIndex + 1) : [];
+
+    const hasListWrapper = listIndex >= 0;
+    const hasOuterNonNull = outerWrappers.includes("nonNull");
+    const hasOuterNullable = outerWrappers.includes("nullable");
+    const explicitNullable = hasOuterNonNull
+      ? false
+      : hasOuterNullable
+        ? true
+        : null;
+    const wrapperRequired = innerWrappers.includes("nonNull")
+      ? true
+      : innerWrappers.includes("nullable")
+        ? false
+        : null;
+
+    const fieldNameArg = call.arguments[0];
+    if (fieldNameArg?.type !== "StringLiteral") {
+      return null;
+    }
+
+    const fieldName = fieldNameArg.value;
+    const configArg = call.arguments[1];
+    const configProps =
+      configArg?.type === "ObjectExpression" ? [...configArg.properties] : [];
+
+    const argsProperty = configProps.find(
+      property => property.key?.name === "args"
+    );
+    if (argsProperty?.value?.type === "ObjectExpression") {
+      argsProperty.value.properties =
+        argsProperty.value.properties.map(transformArgProperty);
+    }
+
+    const authorizeProperty = configProps.find(
+      property => property.key?.name === "authorize"
+    );
+    if (authorizeProperty) {
+      authorizeProperty.key.name = "authScopes";
+    }
+
+    if (method === "field") {
+      const typeProperty = configProps.find(
+        property => property.key?.name === "type"
+      );
+      if (!typeProperty) {
+        return null;
+      }
+
+      const normalizedType = normalizeFieldType(
+        typeProperty.value,
+        hasListWrapper
+      );
+      typeProperty.value = normalizedType.type;
+
+      const resolveProperty = configProps.find(
+        property => property.key?.name === "resolve"
+      );
+      const authScopesProperty = configProps.find(
+        property => property.key?.name === "authScopes"
+      );
+
+      const shouldSetRequired = normalizedType.hasList;
+      const requiredValue =
+        wrapperRequired ??
+        normalizedType.required ??
+        (shouldSetRequired ? false : null);
+      const requiredProperty =
+        typeof requiredValue === "boolean"
+          ? j.property(
+              "init",
+              j.identifier("required"),
+              j.booleanLiteral(requiredValue)
+            )
+          : null;
+
+      const shouldSetNullable =
+        explicitNullable !== null ||
+        normalizedType.hasList ||
+        normalizedType.required !== null;
+      const nullableProperty = shouldSetNullable
+        ? j.property(
+            "init",
+            j.identifier("nullable"),
+            j.booleanLiteral(explicitNullable ?? true)
+          )
+        : null;
+
+      const extraProperties = configProps.filter(
+        property =>
+          ![
+            "type",
+            "nullable",
+            "required",
+            "args",
+            "authorize",
+            "authScopes",
+            "resolve"
+          ].includes(property.key?.name)
+      );
+
+      const fieldConfigProperties = [
+        typeProperty,
+        nullableProperty,
+        requiredProperty,
+        argsProperty,
+        authScopesProperty,
+        ...extraProperties,
+        resolveProperty
+      ].filter(Boolean);
+
+      return j.property(
+        "init",
+        j.identifier(fieldName),
+        j.callExpression(
+          j.memberExpression(j.identifier("t"), j.identifier("field")),
+          [j.objectExpression(fieldConfigProperties)]
+        )
+      );
+    }
+
+    const transformedMethod = hasListWrapper ? `${method}List` : method;
+    const resolveProperty = configProps.find(
+      property => property.key?.name === "resolve"
+    );
+    const authScopesProperty = configProps.find(
+      property => property.key?.name === "authScopes"
+    );
+
+    const requiredValue = hasListWrapper ? (wrapperRequired ?? false) : null;
+    const requiredProperty =
+      typeof requiredValue === "boolean"
+        ? j.property(
+            "init",
+            j.identifier("required"),
+            j.booleanLiteral(requiredValue)
+          )
+        : null;
+
+    const nullableValue = hasListWrapper
+      ? (explicitNullable ?? true)
+      : explicitNullable !== null
+        ? explicitNullable
+        : null;
+    const nullableProperty =
+      typeof nullableValue === "boolean"
+        ? j.property(
+            "init",
+            j.identifier("nullable"),
+            j.booleanLiteral(nullableValue)
+          )
+        : null;
+
+    const extraProperties = configProps.filter(
+      property =>
+        ![
+          "nullable",
+          "required",
+          "args",
+          "authorize",
+          "authScopes",
+          "resolve"
+        ].includes(property.key?.name)
+    );
+
+    const methodConfigProps = [
+      nullableProperty,
+      requiredProperty,
+      argsProperty,
+      authScopesProperty,
+      ...extraProperties,
+      resolveProperty
+    ].filter(Boolean);
+
+    const methodArguments = methodConfigProps.length
+      ? [j.objectExpression(methodConfigProps)]
+      : [];
+
+    return j.property(
+      "init",
+      j.identifier(fieldName),
+      j.callExpression(
+        j.memberExpression(j.identifier("t"), j.identifier(transformedMethod)),
+        methodArguments
+      )
+    );
+  };
+
   const objectTypes = ["objectType", "interfaceType", "inputObjectType"];
   const objects = root.find(j.CallExpression, {
     callee: {
@@ -107,43 +409,8 @@ const transform: Transform = (file, api) => {
     }
     const newArgs = config.properties.find(p => p.key.name === "args");
     if (newArgs) {
-      newArgs.value.properties = newArgs.value.properties.map(p => {
-        const name = p.key.name;
-        const nonNullable = p.value.callee.name === "nonNull";
-        const params = [];
-        if (nonNullable) {
-          params.push(
-            j.property("init", j.identifier("required"), j.booleanLiteral(true))
-          );
-        }
-        const val = p.value.arguments[0] ?? p.value;
-        let newArg;
-        if (val.type === "Identifier") {
-          params.unshift(j.property("init", j.identifier("type"), val));
-          newArg = j.callExpression(
-            j.memberExpression(j.identifier("t"), j.identifier("arg")),
-            [j.objectExpression(params)]
-          );
-        } else if (val.type === "ExpressionStatement") {
-          params.unshift(
-            j.property("init", j.identifier("type"), val.expression)
-          );
-          newArg = j.callExpression(
-            j.memberExpression(j.identifier("t"), j.identifier("arg")),
-            [j.objectExpression(params)]
-          );
-        } else {
-          const type = val.callee.name.match(/[a-z]+/g)[0];
-          newArg = j.callExpression(
-            j.memberExpression(
-              j.memberExpression(j.identifier("t"), j.identifier("arg")),
-              j.identifier(type)
-            ),
-            params.length ? [j.objectExpression(params)] : []
-          );
-        }
-        return j.property("init", j.identifier(name), newArg);
-      });
+      newArgs.value.properties =
+        newArgs.value.properties.map(transformArgProperty);
     }
     const typeProperty = config.properties.find(p => p.key.name === "type");
     const isNullable =
@@ -179,13 +446,98 @@ const transform: Transform = (file, api) => {
   relayQueries.replaceWith(p => {
     const functionName = p.value.callee.name;
     const args = p.value.arguments;
-    if (args.length === 0) {
+    if (args.length === 0 || args[0]?.type !== "ArrowFunctionExpression") {
       return p.value;
     }
-    const connectionFieldArguments = args[0].body.body[0].expression.arguments;
+    const arrowBody = args[0].body;
+    const calls =
+      arrowBody.type === "BlockStatement"
+        ? arrowBody.body
+            .filter(s => s.type === "ExpressionStatement")
+            .map(s => s.expression)
+            .filter(e => e.type === "CallExpression")
+        : arrowBody.type === "CallExpression"
+          ? [arrowBody]
+          : [];
+
+    if (!calls.length) {
+      return p.value;
+    }
+
+    const memberNames = calls
+      .map(call =>
+        call.callee.type === "MemberExpression" &&
+        call.callee.property.type === "Identifier"
+          ? call.callee.property.name
+          : null
+      )
+      .filter(Boolean);
+
+    const isConnectionFieldShape = memberNames.every(
+      name => name === "connectionField"
+    );
+    const supportedRootMethods = [
+      "field",
+      "boolean",
+      "int",
+      "string",
+      "id",
+      "float"
+    ];
+
+    const isSupportedRootShape = memberNames.every(name =>
+      supportedRootMethods.includes(name)
+    );
+
+    if (isSupportedRootShape) {
+      const transformedFields = calls.map(transformRootFieldCall);
+
+      if (transformedFields.some(field => !field)) {
+        return p.value;
+      }
+
+      if (!transformedFields.length) {
+        return p.value;
+      }
+
+      const rootTypeName =
+        functionName === "queryField" ? "queryType" : "mutationType";
+      return j.callExpression(
+        j.memberExpression(j.identifier("builder"), j.identifier(rootTypeName)),
+        [
+          j.objectExpression([
+            j.property(
+              "init",
+              j.identifier("fields"),
+              j.arrowFunctionExpression(
+                [j.identifier("t")],
+                j.objectExpression(transformedFields)
+              )
+            )
+          ])
+        ]
+      );
+    }
+
+    if (!isConnectionFieldShape) {
+      return p.value;
+    }
+
+    const connectionCall = calls[0];
+    const connectionFieldArguments = connectionCall.arguments;
+    if (
+      connectionFieldArguments.length < 2 ||
+      connectionFieldArguments[0]?.type !== "StringLiteral" ||
+      connectionFieldArguments[1]?.type !== "ObjectExpression"
+    ) {
+      return p.value;
+    }
     const name = connectionFieldArguments[0].value;
     const config = connectionFieldArguments[1];
     const typeProperty = config.properties.find(p => p.key.name === "type");
+    if (!typeProperty) {
+      return p.value;
+    }
     const isNullable =
       typeProperty.value.type === "CallExpression" &&
       typeProperty.value.callee.name === "nullable";

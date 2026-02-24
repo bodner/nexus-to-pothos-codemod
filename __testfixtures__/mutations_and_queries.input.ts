@@ -50,3 +50,49 @@ export const otherStuff4 = queryField('someQuery', {
     return 123;
   }
 });
+
+
+export const EmployeeQuery = queryField((t) => {
+  t.nonNull.boolean('hasEmployees', {
+    resolve: () => true,
+  })
+
+  t.nonNull.field('employee', {
+    type: GraphQLEmployee,
+    args: {
+      id: nonNull(idArg()),
+    },
+    resolve: authenticated((_, {id}) => EmployeeLoader.load(Number(id))),
+  })
+
+  t.nonNull.field('employees', {
+    type: GraphQLPaginatedEmployees,
+    args: {
+      filter: GraphQLEmployeeFilter,
+      limit: intArg(),
+      offset: intArg(),
+      dependencyFilter: nullable(GraphQLDependencyFilter),
+    },
+    resolve: employeesResolver,
+  })
+});
+
+export const EmployeeMutations = mutationField((t) => {
+  t.nonNull.field('createEmployee', {
+    type: GraphQLEmployee,
+    args: {
+      name: nonNull(stringArg()),
+      departmentId: idArg(),
+    },
+    resolve: createEmployeeResolver,
+  })
+
+  t.field('archiveEmployee', {
+    type: GraphQLEmployee,
+    args: {
+      id: nonNull(idArg()),
+    },
+    authorize: (root, args, ctx) => !!ctx.user,
+    resolve: archiveEmployeeResolver,
+  })
+});
