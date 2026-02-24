@@ -4,6 +4,25 @@ function capitalizeFirstLetter(string: string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+function getMemberChain(callee) {
+  const chain = [];
+  let current = callee;
+  while (current) {
+    if (current.type === "MemberExpression") {
+      if (current.property?.type === "Identifier") {
+        chain.unshift(current.property.name);
+      }
+      current = current.object;
+      continue;
+    }
+    if (current.type === "Identifier") {
+      chain.unshift(current.name);
+    }
+    break;
+  }
+  return chain;
+}
+
 const transform: Transform = (file, api) => {
   const j = api.jscodeshift;
   const { statement } = j.template;
@@ -252,19 +271,25 @@ const transform: Transform = (file, api) => {
       .map((node, idx) => {
         try {
           const functionName = node.expression.callee.property.name;
+          const memberChain = getMemberChain(node.expression.callee);
+          const hasList = memberChain.includes("list");
+          const hasNonNull = memberChain.includes("nonNull");
+          const hasNullable = memberChain.includes("nullable");
           if (functionName === "implements") {
             implementsInterfaces.push(node.expression.arguments[0].name);
             return null;
           }
-          const isNullable =
-            node.expression.callee.object.property?.name === "nullable";
+          const isNullable = hasList ? !hasNonNull : hasNullable;
           if (
             objectType === "interfaceRef" ||
             objectType === "inputType" ||
             (node.expression.arguments.length === 2 &&
               node.expression.callee.property.name !== "field")
           ) {
-            const functionName = node.expression.callee.property.name;
+            let transformedFunctionName = node.expression.callee.property.name;
+            if (hasList && transformedFunctionName !== "field") {
+              transformedFunctionName = `${transformedFunctionName}List`;
+            }
             const args = [];
             let name;
             if (functionName === "field") {
@@ -291,7 +316,7 @@ const transform: Transform = (file, api) => {
               args.push(j.objectExpression(props));
             } else if (node.expression.arguments[1]) {
               name = node.expression.arguments[0].value;
-              const props = node.expression.arguments[1].properties;
+              const props = [...node.expression.arguments[1].properties];
               if (isNullable) {
                 props.unshift(
                   j.property(
@@ -300,6 +325,24 @@ const transform: Transform = (file, api) => {
                     j.booleanLiteral(true)
                   )
                 );
+              }
+              if (hasList) {
+                props.unshift(
+                  j.property(
+                    "init",
+                    j.identifier("required"),
+                    j.booleanLiteral(false)
+                  )
+                );
+                if (!isNullable) {
+                  props.unshift(
+                    j.property(
+                      "init",
+                      j.identifier("nullable"),
+                      j.booleanLiteral(false)
+                    )
+                  );
+                }
               }
               args.push(j.objectExpression(props));
             } else {
@@ -311,7 +354,7 @@ const transform: Transform = (file, api) => {
               j.callExpression(
                 j.memberExpression(
                   j.identifier("t"),
-                  j.identifier(functionName)
+                  j.identifier(transformedFunctionName)
                 ),
                 args
               )
@@ -365,14 +408,37 @@ const transform: Transform = (file, api) => {
           const objectProps = [];
           if (functionName === "field") {
             let finalType = type;
-            if (type.type === "CallExpression" && type.callee.name === "list") {
-              finalType = j.arrayExpression([type.arguments[0]]);
+            if (
+              hasList ||
+              (type.type === "CallExpression" && type.callee.name === "list")
+            ) {
+              const listType =
+                type.type === "CallExpression" && type.callee.name === "list"
+                  ? type.arguments[0]
+                  : type;
+              finalType = j.arrayExpression([listType]);
             }
             objectProps.push(
               j.property("init", j.identifier("type"), finalType)
             );
+            if (hasList) {
+              objectProps.push(
+                j.property(
+                  "init",
+                  j.identifier("required"),
+                  j.booleanLiteral(false)
+                )
+              );
+              objectProps.push(
+                j.property(
+                  "init",
+                  j.identifier("nullable"),
+                  j.booleanLiteral(!hasNonNull)
+                )
+              );
+            }
           }
-          if (isNullable) {
+          if (isNullable && !hasList) {
             objectProps.push(
               j.property(
                 "init",

@@ -71,30 +71,26 @@ export const Input = builder.inputType('Input', {
   })
 });
 
-export const RandomObjectType =
-  builder.objectRef<any>('RandomObjectType')
- .implement({
-  fields: (t) => ({
+export const RandomObjectType = builder.objectRef<any>('RandomObjectType')
+  .implement({
+  fields: t => ({
     listOfNullableBooleans: t.booleanList({
-      nullable: true,   
-      required: false, 
-      resolve: () => [true, null, false],
+      required: false,
+      nullable: true,
+      resolve: () => [true, null, false]
     }),
 
     nonNullListOfNullableStrings: t.stringList({
-      nullable: false,  
-      required: false, 
-      resolve: () => ['a', null, 'b'],
+      nullable: false,
+      required: false,
+      resolve: () => ['a', null, 'b']
     }),
 
     nonNullListOfNullableObjects: t.field({
-      type: [SomeRandomType], 
-      nullable: false,        
-      required: false,        
-      resolve: () => [
-        new SomeRandomType(),
-        new SomeRandomType(),
-      ],
-    }),
-  }),
+      type: [SomeRandomType],
+      required: false,
+      nullable: false,
+      resolve: () => [new SomeRandomType(), new SomeRandomType()]
+    })
+  })
 });
