@@ -57,3 +57,19 @@ export const Input = inputObjectType({
     t.int('d');
   }
 });
+
+export const RandomObjectType = objectType({
+  name: 'RandomObjectType',
+  definition(t) {
+    t.nullable.list.boolean('listOfNullableBooleans', {
+      resolve: () => [true, null, false]
+    });
+    t.nonNull.list.nullable.string('nonNullListOfNullableStrings', {
+      resolve: () => ['a', null, 'b']
+    });
+    t.nonNull.list.field('nonNullListOfNullableObjects', {
+      type: SomeRandomType,
+      resolve: () => [new SomeRandomType(), new SomeRandomType()]
+    });
+  }
+});

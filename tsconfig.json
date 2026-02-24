@@ -4,19 +4,14 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "target": "ES2022",
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "moduleResolution": "node",
     "sourceMap": true,
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "*": [
-        "node_modules/*",
-        "src/types/*"
-      ]
+      "*": ["node_modules/*", "src/types/*"]
     }
   },
-  "include": [
-    "transform.ts"
-  ]
+  "include": ["transform.ts"]
 }

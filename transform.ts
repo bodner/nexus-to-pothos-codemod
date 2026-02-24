@@ -249,142 +249,162 @@ const transform: Transform = (file, api) => {
     }
     const implementsInterfaces = [];
     const fields = definitions
-      .map(node => {
-        const functionName = node.expression.callee.property.name;
-        if (functionName === "implements") {
-          implementsInterfaces.push(node.expression.arguments[0].name);
-          return null;
-        }
-        const isNullable =
-          node.expression.callee.object.property?.name === "nullable";
-        if (
-          objectType === "interfaceRef" ||
-          objectType === "inputType" ||
-          (node.expression.arguments.length === 2 &&
-            node.expression.callee.property.name !== "field")
-        ) {
+      .map((node, idx) => {
+        try {
           const functionName = node.expression.callee.property.name;
-          const args = [];
-          let name;
-          if (functionName === "field") {
-            name = node.expression.arguments[0].properties.find(
-              p => p.key.name === "name"
-            ).value.value;
-            j.property(
+          if (functionName === "implements") {
+            implementsInterfaces.push(node.expression.arguments[0].name);
+            return null;
+          }
+          const isNullable =
+            node.expression.callee.object.property?.name === "nullable";
+          if (
+            objectType === "interfaceRef" ||
+            objectType === "inputType" ||
+            (node.expression.arguments.length === 2 &&
+              node.expression.callee.property.name !== "field")
+          ) {
+            const functionName = node.expression.callee.property.name;
+            const args = [];
+            let name;
+            if (functionName === "field") {
+              name = node.expression.arguments[0].properties.find(
+                p => p.key.name === "name"
+              ).value.value;
+              j.property(
+                "init",
+                j.identifier("nullable"),
+                j.booleanLiteral(true)
+              );
+              const props = node.expression.arguments[0].properties.filter(
+                p => p.key.name !== "name"
+              );
+              if (isNullable) {
+                props.unshift(
+                  j.property(
+                    "init",
+                    j.identifier("nullable"),
+                    j.booleanLiteral(true)
+                  )
+                );
+              }
+              args.push(j.objectExpression(props));
+            } else if (node.expression.arguments[1]) {
+              name = node.expression.arguments[0].value;
+              const props = node.expression.arguments[1].properties;
+              if (isNullable) {
+                props.unshift(
+                  j.property(
+                    "init",
+                    j.identifier("nullable"),
+                    j.booleanLiteral(true)
+                  )
+                );
+              }
+              args.push(j.objectExpression(props));
+            } else {
+              name = node.expression.arguments[0].value;
+            }
+            return j.property(
               "init",
-              j.identifier("nullable"),
-              j.booleanLiteral(true)
+              j.identifier(name),
+              j.callExpression(
+                j.memberExpression(
+                  j.identifier("t"),
+                  j.identifier(functionName)
+                ),
+                args
+              )
             );
-            const props = node.expression.arguments[0].properties.filter(
-              p => p.key.name !== "name"
+          }
+
+          let propertyName;
+          let type;
+          let resolve;
+          if (
+            functionName === "field" &&
+            node.expression.arguments[0].type === "ObjectExpression"
+          ) {
+            propertyName = node.expression.arguments[0].properties.find(
+              p => p.key.name === "name"
+            ).value;
+            type = node.expression.arguments[0].properties.find(
+              p => p.key.name === "type"
+            ).value;
+            resolve = node.expression.arguments[0].properties.find(
+              p => p.key.name === "resolve"
             );
-            if (isNullable) {
-              props.unshift(
-                j.property(
-                  "init",
-                  j.identifier("nullable"),
-                  j.booleanLiteral(true)
-                )
-              );
-            }
-            args.push(j.objectExpression(props));
-          } else if (node.expression.arguments[1]) {
-            name = node.expression.arguments[0].value;
-            const props = node.expression.arguments[1].properties;
-            if (isNullable) {
-              props.unshift(
-                j.property(
-                  "init",
-                  j.identifier("nullable"),
-                  j.booleanLiteral(true)
-                )
-              );
-            }
-            args.push(j.objectExpression(props));
+          } else if (functionName === "field") {
+            propertyName = node.expression.arguments[0];
+            type = node.expression.arguments[1].properties.find(
+              p => p.key.name === "type"
+            ).value;
+            resolve = node.expression.arguments[1].properties.find(
+              p => p.key.name === "resolve"
+            );
           } else {
-            name = node.expression.arguments[0].value;
+            propertyName = node.expression.arguments[0];
+            type = functionName;
+            resolve = node.expression.arguments[1]?.properties.find(
+              p => p.key.name === "resolve"
+            );
+          }
+          let exposeName;
+          const functionArguments = [];
+          if (functionName === "field") {
+            if (resolve) {
+              exposeName = "field";
+            } else {
+              exposeName = "expose";
+              functionArguments.push(propertyName);
+            }
+          } else {
+            exposeName = `expose${capitalizeFirstLetter(type === "id" ? "ID" : type)}`;
+            functionArguments.push(propertyName);
+          }
+          const objectProps = [];
+          if (functionName === "field") {
+            let finalType = type;
+            if (type.type === "CallExpression" && type.callee.name === "list") {
+              finalType = j.arrayExpression([type.arguments[0]]);
+            }
+            objectProps.push(
+              j.property("init", j.identifier("type"), finalType)
+            );
+          }
+          if (isNullable) {
+            objectProps.push(
+              j.property(
+                "init",
+                j.identifier("nullable"),
+                j.booleanLiteral(true)
+              )
+            );
+          }
+          if (resolve) {
+            objectProps.push(resolve);
+          }
+          if (objectProps.length) {
+            functionArguments.push(j.objectExpression(objectProps));
           }
           return j.property(
             "init",
-            j.identifier(name),
+            j.identifier(propertyName.value),
             j.callExpression(
-              j.memberExpression(j.identifier("t"), j.identifier(functionName)),
-              args
+              j.memberExpression(j.identifier("t"), j.identifier(exposeName)),
+              functionArguments
             )
           );
-        }
-
-        let propertyName;
-        let type;
-        let resolve;
-        if (
-          functionName === "field" &&
-          node.expression.arguments[0].type === "ObjectExpression"
-        ) {
-          propertyName = node.expression.arguments[0].properties.find(
-            p => p.key.name === "name"
-          ).value;
-          type = node.expression.arguments[0].properties.find(
-            p => p.key.name === "type"
-          ).value;
-          resolve = node.expression.arguments[0].properties.find(
-            p => p.key.name === "resolve"
+        } catch (err) {
+          console.error(
+            `[codemod] Failed in ${file.path} at definition index ${idx}`
           );
-        } else if (functionName === "field") {
-          propertyName = node.expression.arguments[0];
-          type = node.expression.arguments[1].properties.find(
-            p => p.key.name === "type"
-          ).value;
-          resolve = node.expression.arguments[1].properties.find(
-            p => p.key.name === "resolve"
+          console.error(`[codemod] Node source:\n${j(node).toSource()}`);
+          console.error(
+            `[codemod] args length: ${node?.expression?.arguments?.length ?? "n/a"}`
           );
-        } else {
-          propertyName = node.expression.arguments[0];
-          type = functionName;
-          resolve = node.expression.arguments[1]?.properties.find(
-            p => p.key.name === "resolve"
-          );
+          throw err;
         }
-        let exposeName;
-        const functionArguments = [];
-        if (functionName === "field") {
-          if (resolve) {
-            exposeName = "field";
-          } else {
-            exposeName = "expose";
-            functionArguments.push(propertyName);
-          }
-        } else {
-          exposeName = `expose${capitalizeFirstLetter(type === "id" ? "ID" : type)}`;
-          functionArguments.push(propertyName);
-        }
-        const objectProps = [];
-        if (functionName === "field") {
-          let finalType = type;
-          if (type.type === "CallExpression" && type.callee.name === "list") {
-            finalType = j.arrayExpression([type.arguments[0]]);
-          }
-          objectProps.push(j.property("init", j.identifier("type"), finalType));
-        }
-        if (isNullable) {
-          objectProps.push(
-            j.property("init", j.identifier("nullable"), j.booleanLiteral(true))
-          );
-        }
-        if (resolve) {
-          objectProps.push(resolve);
-        }
-        if (objectProps.length) {
-          functionArguments.push(j.objectExpression(objectProps));
-        }
-        return j.property(
-          "init",
-          j.identifier(propertyName.value),
-          j.callExpression(
-            j.memberExpression(j.identifier("t"), j.identifier(exposeName)),
-            functionArguments
-          )
-        );
       })
       .filter(Boolean);
     const objectProps = [];
