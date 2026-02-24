@@ -326,7 +326,9 @@ const transform: Transform = (file, api) => {
                 );
               }
               args.push(j.objectExpression(props));
-            } else if (node.expression.arguments[1]?.type === "ObjectExpression") {
+            } else if (
+              node.expression.arguments[1]?.type === "ObjectExpression"
+            ) {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
               if (isNullable) {
