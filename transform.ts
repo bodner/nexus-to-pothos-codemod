@@ -108,8 +108,31 @@ const transform: Transform = (file, api) => {
     }
   };
 
-  const normalizeFieldType = (typeNode, hasListWrapper) => {
+  const unwrapTypeNullability = typeNode => {
     let type = typeNode;
+    let explicitNullable: boolean | null = null;
+
+    while (
+      type?.type === "CallExpression" &&
+      type.callee?.type === "Identifier" &&
+      ["nonNull", "nullable"].includes(type.callee.name) &&
+      type.arguments?.length
+    ) {
+      if (explicitNullable === null) {
+        explicitNullable = type.callee.name === "nullable";
+      }
+      type = type.arguments[0];
+    }
+
+    return {
+      type,
+      explicitNullable
+    };
+  };
+
+  const normalizeFieldType = (typeNode, hasListWrapper) => {
+    const unwrappedType = unwrapTypeNullability(typeNode);
+    let type = unwrappedType.type;
     let required: boolean | null = null;
     let hasList = hasListWrapper;
 
@@ -131,7 +154,8 @@ const transform: Transform = (file, api) => {
     return {
       type,
       hasList,
-      required
+      required,
+      explicitNullable: unwrappedType.explicitNullable
     };
   };
 
@@ -201,6 +225,9 @@ const transform: Transform = (file, api) => {
       );
       typeProperty.value = normalizedType.type;
 
+      const effectiveNullable =
+        explicitNullable ?? normalizedType.explicitNullable;
+
       const resolveProperty = configProps.find(
         property => property.key?.name === "resolve"
       );
@@ -223,14 +250,14 @@ const transform: Transform = (file, api) => {
           : null;
 
       const shouldSetNullable =
-        explicitNullable !== null ||
+        effectiveNullable !== null ||
         normalizedType.hasList ||
         normalizedType.required !== null;
       const nullableProperty = shouldSetNullable
         ? j.property(
             "init",
             j.identifier("nullable"),
-            j.booleanLiteral(explicitNullable ?? true)
+            j.booleanLiteral(effectiveNullable ?? true)
           )
         : null;
 
@@ -413,18 +440,10 @@ const transform: Transform = (file, api) => {
         newArgs.value.properties.map(transformArgProperty);
     }
     const typeProperty = config.properties.find(p => p.key.name === "type");
-    const isNullable =
-      typeProperty.value.type === "CallExpression" &&
-      typeProperty.value.callee.name === "nullable";
-    if (isNullable) {
-      if (typeProperty.value.arguments[0]?.callee?.name === "list") {
-        typeProperty.value = j.arrayExpression([
-          typeProperty.value.arguments[0].arguments[0]
-        ]);
-      } else {
-        typeProperty.value = typeProperty.value.arguments[0];
-      }
-    } else if (
+    const normalizedType = unwrapTypeNullability(typeProperty.value);
+    typeProperty.value = normalizedType.type;
+    const isNullable = normalizedType.explicitNullable === true;
+    if (
       typeProperty.value.type === "CallExpression" &&
       typeProperty.value.callee.name === "list"
     ) {
@@ -538,11 +557,14 @@ const transform: Transform = (file, api) => {
     if (!typeProperty) {
       return p.value;
     }
-    const isNullable =
+    const normalizedConnectionType = unwrapTypeNullability(typeProperty.value);
+    typeProperty.value = normalizedConnectionType.type;
+    const isNullable = normalizedConnectionType.explicitNullable === true;
+    if (
       typeProperty.value.type === "CallExpression" &&
-      typeProperty.value.callee.name === "nullable";
-    if (isNullable) {
-      typeProperty.value = typeProperty.value.arguments[0];
+      typeProperty.value.callee.name === "list"
+    ) {
+      typeProperty.value = j.arrayExpression([typeProperty.value.arguments[0]]);
     }
     const additionalArgs = config.properties.find(
       p => p.key.name === "additionalArgs"
@@ -785,15 +807,22 @@ const transform: Transform = (file, api) => {
           const objectProps = [];
           let hasListTypeWrapper = false;
           let listItemRequired: boolean | null = null;
+          let explicitTypeNullable: boolean | null = null;
           if (functionName === "field") {
-            let finalType = type;
+            const normalizedType = unwrapTypeNullability(type);
+            let finalType = normalizedType.type;
+            explicitTypeNullable = normalizedType.explicitNullable;
             if (
               hasList ||
-              (type.type === "CallExpression" && type.callee.name === "list")
+              (finalType.type === "CallExpression" &&
+                finalType.callee.name === "list")
             ) {
               hasListTypeWrapper =
-                type.type === "CallExpression" && type.callee.name === "list";
-              let listType = hasListTypeWrapper ? type.arguments[0] : type;
+                finalType.type === "CallExpression" &&
+                finalType.callee.name === "list";
+              let listType = hasListTypeWrapper
+                ? finalType.arguments[0]
+                : finalType;
               if (
                 hasListTypeWrapper &&
                 listType?.type === "CallExpression" &&
@@ -832,22 +861,28 @@ const transform: Transform = (file, api) => {
                   )
                 );
               }
+              const listNullableValue =
+                explicitTypeNullable ??
+                (hasNonNull ? false : hasNullable ? true : true);
               if (
-                hasNullable ||
-                hasNonNull ||
+                explicitTypeNullable !== null ||
                 typeof listItemRequired === "boolean"
               ) {
                 objectProps.push(
                   j.property(
                     "init",
                     j.identifier("nullable"),
-                    j.booleanLiteral(!hasNonNull)
+                    j.booleanLiteral(listNullableValue)
                   )
                 );
               }
             }
           }
-          if (isNullable && !hasList && !hasListTypeWrapper) {
+          if (
+            (isNullable || explicitTypeNullable) &&
+            !hasList &&
+            !hasListTypeWrapper
+          ) {
             objectProps.push(
               j.property(
                 "init",

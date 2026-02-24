@@ -114,3 +114,41 @@ export const InputWithField = inputObjectType({
     });
   }
 });
+
+export const DeviceWithUser = objectType({
+  name: 'DeviceWithUser',
+  definition(t) {
+    t.string('deviceId');
+
+    t.field('user', {
+      type: nonNull(GraphQLUser),
+      resolve: (device) =>
+        prisma.device
+          .findUniqueOrThrow({
+            where: {
+              deviceId: device.deviceId,
+            },
+          })
+          .user()
+    });
+  }
+});
+
+export const DeviceWithNullableUser = objectType({
+  name: 'DeviceWithNullableUser',
+  definition(t) {
+    t.string('deviceId');
+
+    t.field('user', {
+      type: nullable(GraphQLUser),
+      resolve: (device) =>
+        prisma.device
+          .findUniqueOrThrow({
+            where: {
+              deviceId: device.deviceId,
+            },
+          })
+          .user()
+    });
+  }
+});

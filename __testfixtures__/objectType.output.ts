@@ -146,3 +146,44 @@ export const InputWithField = builder.inputType('InputWithField', {
     })
   })
 });
+
+export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
+  .implement({
+  fields: t => ({
+    deviceId: t.exposeString('deviceId'),
+
+    user: t.field({
+      type: GraphQLUser,
+
+      resolve: (device) =>
+        prisma.device
+          .findUniqueOrThrow({
+            where: {
+              deviceId: device.deviceId,
+            },
+          })
+          .user()
+    })
+  })
+});
+
+export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
+  .implement({
+  fields: t => ({
+    deviceId: t.exposeString('deviceId'),
+
+    user: t.field({
+      type: GraphQLUser,
+      nullable: true,
+
+      resolve: (device) =>
+        prisma.device
+          .findUniqueOrThrow({
+            where: {
+              deviceId: device.deviceId,
+            },
+          })
+          .user()
+    })
+  })
+});
