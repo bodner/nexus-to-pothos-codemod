@@ -73,3 +73,35 @@ export const RandomObjectType = objectType({
     });
   }
 });
+
+export const ListObjectType = objectType({
+  name: 'ListObjectType',
+  definition(t) {
+    t.field('departments', {
+      type: list(nonNull(GraphQLDepartment)),
+      resolve: () => {
+        return [
+          { id: '1', name: 'HR' },
+          { id: '2', name: 'Engineering' }
+        ];
+      }
+    });
+    t.nonNull.field('divisions', {
+      type: list(nonNull(GraphQLDivision)),
+      resolve: () => {
+        return [
+          { id: '1', name: 'Sales' },
+          { id: '2', name: 'Marketing' }
+        ];
+      }
+    });
+    t.nullable.field('companies', {
+      type: list(nullable(GraphQLCompany)),
+      resolve: () => {
+        return [
+          { id: '1', name: 'Company1' },
+          { id: '2', name: 'Company2' }
+        ];
+      }
+    });
+}});

@@ -94,3 +94,47 @@ export const RandomObjectType = builder.objectRef<any>('RandomObjectType')
     })
   })
 });
+
+export const ListObjectType = builder.objectRef<any>('ListObjectType')
+  .implement({
+  fields: t => ({
+    departments: t.field({
+      type: [GraphQLDepartment],
+      required: true,
+      nullable: true,
+
+      resolve: () => {
+        return [
+          { id: '1', name: 'HR' },
+          { id: '2', name: 'Engineering' }
+        ];
+      }
+    }),
+
+    divisions: t.field({
+      type: [GraphQLDivision],
+      required: true,
+      nullable: false,
+
+      resolve: () => {
+        return [
+          { id: '1', name: 'Sales' },
+          { id: '2', name: 'Marketing' }
+        ];
+      }
+    }),
+
+    companies: t.field({
+      type: [GraphQLCompany],
+      required: false,
+      nullable: true,
+
+      resolve: () => {
+        return [
+          { id: '1', name: 'Company1' },
+          { id: '2', name: 'Company2' }
+        ];
+      }
+    })
+  })
+});

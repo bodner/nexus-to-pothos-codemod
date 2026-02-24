@@ -406,16 +406,25 @@ const transform: Transform = (file, api) => {
             functionArguments.push(propertyName);
           }
           const objectProps = [];
+          let hasListTypeWrapper = false;
+          let listItemRequired: boolean | null = null;
           if (functionName === "field") {
             let finalType = type;
             if (
               hasList ||
               (type.type === "CallExpression" && type.callee.name === "list")
             ) {
-              const listType =
-                type.type === "CallExpression" && type.callee.name === "list"
-                  ? type.arguments[0]
-                  : type;
+              hasListTypeWrapper =
+                type.type === "CallExpression" && type.callee.name === "list";
+              let listType = hasListTypeWrapper ? type.arguments[0] : type;
+              if (
+                hasListTypeWrapper &&
+                listType?.type === "CallExpression" &&
+                ["nonNull", "nullable"].includes(listType.callee?.name)
+              ) {
+                listItemRequired = listType.callee.name === "nonNull";
+                listType = listType.arguments[0];
+              }
               finalType = j.arrayExpression([listType]);
             }
             objectProps.push(
@@ -436,9 +445,32 @@ const transform: Transform = (file, api) => {
                   j.booleanLiteral(!hasNonNull)
                 )
               );
+            } else if (hasListTypeWrapper) {
+              if (typeof listItemRequired === "boolean") {
+                objectProps.push(
+                  j.property(
+                    "init",
+                    j.identifier("required"),
+                    j.booleanLiteral(listItemRequired)
+                  )
+                );
+              }
+              if (
+                hasNullable ||
+                hasNonNull ||
+                typeof listItemRequired === "boolean"
+              ) {
+                objectProps.push(
+                  j.property(
+                    "init",
+                    j.identifier("nullable"),
+                    j.booleanLiteral(!hasNonNull)
+                  )
+                );
+              }
             }
           }
-          if (isNullable && !hasList) {
+          if (isNullable && !hasList && !hasListTypeWrapper) {
             objectProps.push(
               j.property(
                 "init",
