@@ -293,17 +293,29 @@ const transform: Transform = (file, api) => {
             const args = [];
             let name;
             if (functionName === "field") {
-              name = node.expression.arguments[0].properties.find(
-                p => p.key.name === "name"
-              ).value.value;
-              j.property(
-                "init",
-                j.identifier("nullable"),
-                j.booleanLiteral(true)
-              );
-              const props = node.expression.arguments[0].properties.filter(
-                p => p.key.name !== "name"
-              );
+              const fieldArgument = node.expression.arguments[0];
+              const fieldConfig = node.expression.arguments[1];
+              let props = [];
+              if (fieldArgument?.type === "ObjectExpression") {
+                const nameProperty = fieldArgument.properties.find(
+                  p => p.key?.name === "name"
+                );
+                if (!nameProperty) {
+                  return node;
+                }
+                name = nameProperty.value.value;
+                props = fieldArgument.properties.filter(
+                  p => p.key?.name !== "name"
+                );
+              } else if (
+                fieldConfig?.type === "ObjectExpression" &&
+                fieldArgument?.type === "StringLiteral"
+              ) {
+                name = fieldArgument.value;
+                props = [...fieldConfig.properties];
+              } else {
+                return node;
+              }
               if (isNullable) {
                 props.unshift(
                   j.property(
@@ -314,7 +326,7 @@ const transform: Transform = (file, api) => {
                 );
               }
               args.push(j.objectExpression(props));
-            } else if (node.expression.arguments[1]) {
+            } else if (node.expression.arguments[1]?.type === "ObjectExpression") {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
               if (isNullable) {
@@ -378,10 +390,17 @@ const transform: Transform = (file, api) => {
               p => p.key.name === "resolve"
             );
           } else if (functionName === "field") {
+            if (node.expression.arguments[1]?.type !== "ObjectExpression") {
+              return node;
+            }
             propertyName = node.expression.arguments[0];
-            type = node.expression.arguments[1].properties.find(
+            const typeProperty = node.expression.arguments[1].properties.find(
               p => p.key.name === "type"
-            ).value;
+            );
+            if (!typeProperty) {
+              return node;
+            }
+            type = typeProperty.value;
             resolve = node.expression.arguments[1].properties.find(
               p => p.key.name === "resolve"
             );

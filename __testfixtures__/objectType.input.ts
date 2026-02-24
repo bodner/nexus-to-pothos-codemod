@@ -105,3 +105,12 @@ export const ListObjectType = objectType({
       }
     });
 }});
+
+export const InputWithField = inputObjectType({
+  name: 'InputWithField',
+  definition(t) {
+    t.field('departments', {
+      type: list(nonNull(GraphQLEmployeeDepartmentOptionalInput))
+    });
+  }
+});

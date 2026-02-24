@@ -138,3 +138,11 @@ export const ListObjectType = builder.objectRef<any>('ListObjectType')
     })
   })
 });
+
+export const InputWithField = builder.inputType('InputWithField', {
+  fields: t => ({
+    departments: t.field({
+      type: list(nonNull(GraphQLEmployeeDepartmentOptionalInput))
+    })
+  })
+});
