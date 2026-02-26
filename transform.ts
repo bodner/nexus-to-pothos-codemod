@@ -32,6 +32,66 @@ const transform: Transform = (file, api) => {
   const { statement } = j.template;
   const root = j(file.source);
 
+  const upsertNamedImport = (source: string, importNames: string[]) => {
+    if (!importNames.length) {
+      return;
+    }
+
+    const programBody = root.get().node.program.body;
+    const sourceImport = root
+      .find(j.ImportDeclaration)
+      .filter(path => path.value.source?.value === source)
+      .at(0)
+      .nodes()[0];
+
+    if (sourceImport) {
+      sourceImport.specifiers = sourceImport.specifiers || [];
+      const existingImportedNames = new Set(
+        sourceImport.specifiers
+          .filter(s => s.type === "ImportSpecifier")
+          .map(s => s.imported?.type === "Identifier" ? s.imported.name : "")
+          .filter(Boolean)
+      );
+
+      importNames.forEach(importName => {
+        if (!existingImportedNames.has(importName)) {
+          sourceImport.specifiers.push(
+            j.importSpecifier(j.identifier(importName))
+          );
+        }
+      });
+      return;
+    }
+
+    const newImport = j.importDeclaration(
+      importNames.map(importName => j.importSpecifier(j.identifier(importName))),
+      j.stringLiteral(source)
+    );
+
+    const lastImportIndex = programBody.reduce((lastIndex, node, index) => {
+      return node.type === "ImportDeclaration" ? index : lastIndex;
+    }, -1);
+
+    if (lastImportIndex >= 0) {
+      programBody.splice(lastImportIndex + 1, 0, newImport);
+    } else {
+      programBody.unshift(newImport);
+    }
+  };
+
+  const hasLocalImportBinding = (localName: string) => {
+    return (
+      root
+        .find(j.ImportDeclaration)
+        .filter(path =>
+          path.value.specifiers?.some(specifier => specifier.local?.name === localName)
+        )
+        .size() > 0
+    );
+  };
+
+  const objectRefTypeImportNames = new Set<string>();
+
   const transformArgProperty = p => {
     const argName = p.key.name;
     const isNonNullWrapper =
@@ -959,10 +1019,51 @@ const transform: Transform = (file, api) => {
         implementCall.callee.object.typeParameters.params = [
           j.tsTypeReference(j.identifier(type.value))
         ];
+        if (objectType === "objectRef") {
+          objectRefTypeImportNames.add(type.value);
+        }
       }
     }
     return refStatement;
   });
+
+  const usesBuilder =
+    root.find(j.MemberExpression, {
+      object: { type: "Identifier", name: "builder" }
+    }).size() > 0;
+  if (usesBuilder && !hasLocalImportBinding("builder")) {
+    upsertNamedImport("#/schema/builder.js", ["builder"]);
+  }
+
+  const objectRefTypeImports = new Set<string>(objectRefTypeImportNames);
+  root
+    .find(j.CallExpression, {
+      callee: {
+        type: "MemberExpression",
+        object: { type: "Identifier", name: "builder" },
+        property: { type: "Identifier", name: "objectRef" }
+      }
+    })
+    .forEach(path => {
+      const typeParams = path.value.typeParameters || path.value.typeArguments;
+      if (!typeParams || typeParams.type !== "TSTypeParameterInstantiation") {
+        return;
+      }
+
+      typeParams.params.forEach(param => {
+        if (
+          param.type === "TSTypeReference" &&
+          param.typeName.type === "Identifier"
+        ) {
+          objectRefTypeImports.add(param.typeName.name);
+        }
+      });
+    });
+
+  if (objectRefTypeImports.size > 0) {
+    upsertNamedImport("@prisma/client", [...objectRefTypeImports].sort());
+  }
+
   return root.toSource();
 };
 

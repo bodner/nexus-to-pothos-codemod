@@ -1,3 +1,13 @@
+import { builder } from "#/schema/builder.js";
+
+import {
+  DeviceWithNullableUser,
+  DeviceWithUser,
+  ListObjectType,
+  RandomObjectType,
+  SomeObjectType,
+} from "@prisma/client";
+
 export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType')
   .implement({
   interfaces: [SomeType1],
