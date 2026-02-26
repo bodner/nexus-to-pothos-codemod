@@ -49,7 +49,7 @@ const transform: Transform = (file, api) => {
       const existingImportedNames = new Set(
         sourceImport.specifiers
           .filter(s => s.type === "ImportSpecifier")
-          .map(s => s.imported?.type === "Identifier" ? s.imported.name : "")
+          .map(s => (s.imported?.type === "Identifier" ? s.imported.name : ""))
           .filter(Boolean)
       );
 
@@ -64,7 +64,9 @@ const transform: Transform = (file, api) => {
     }
 
     const newImport = j.importDeclaration(
-      importNames.map(importName => j.importSpecifier(j.identifier(importName))),
+      importNames.map(importName =>
+        j.importSpecifier(j.identifier(importName))
+      ),
       j.stringLiteral(source)
     );
 
@@ -84,7 +86,9 @@ const transform: Transform = (file, api) => {
       root
         .find(j.ImportDeclaration)
         .filter(path =>
-          path.value.specifiers?.some(specifier => specifier.local?.name === localName)
+          path.value.specifiers?.some(
+            specifier => specifier.local?.name === localName
+          )
         )
         .size() > 0
     );
@@ -1028,9 +1032,11 @@ const transform: Transform = (file, api) => {
   });
 
   const usesBuilder =
-    root.find(j.MemberExpression, {
-      object: { type: "Identifier", name: "builder" }
-    }).size() > 0;
+    root
+      .find(j.MemberExpression, {
+        object: { type: "Identifier", name: "builder" }
+      })
+      .size() > 0;
   if (usesBuilder && !hasLocalImportBinding("builder")) {
     upsertNamedImport("#/schema/builder.js", ["builder"]);
   }
