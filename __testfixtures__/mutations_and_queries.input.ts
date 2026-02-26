@@ -95,4 +95,15 @@ export const EmployeeMutations = mutationField((t) => {
     authorize: (root, args, ctx) => !!ctx.user,
     resolve: archiveEmployeeResolver,
   })
+
+  t.nonNull.list.nonNull.field('privileges', {
+      type: GraphQLPrivilege,
+      args: {
+        filter: arg({type: GraphQLPrivilegeGroupFilter}),
+      },
+      resolve: (group, {filter}) =>
+        prisma.privilegeGroup
+          .findUniqueOrThrow({where: {id: group.id}})
+          .privileges({where: {id: {contains: filter?.searchTerm ?? undefined}}}),
+    })
 });

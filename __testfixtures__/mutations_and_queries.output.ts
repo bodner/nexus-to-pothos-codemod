@@ -151,6 +151,23 @@ export const EmployeeMutations = builder.mutationType({
 
       authScopes: (root, args, ctx) => !!ctx.user,
       resolve: archiveEmployeeResolver
+    }),
+
+    privileges: t.field({
+      type: [GraphQLPrivilege],
+      nullable: false,
+      required: true,
+
+      args: {
+        filter: t.arg({
+          type: GraphQLPrivilegeGroupFilter
+        })
+      },
+
+      resolve: (group, {filter}) =>
+        prisma.privilegeGroup
+          .findUniqueOrThrow({where: {id: group.id}})
+          .privileges({where: {id: {contains: filter?.searchTerm ?? undefined}}})
     })
   })
 });

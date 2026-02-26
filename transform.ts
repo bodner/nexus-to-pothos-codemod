@@ -134,21 +134,43 @@ const transform: Transform = (file, api) => {
       val?.type === "CallExpression" &&
       val.callee?.type === "Identifier"
     ) {
-      const type = val.callee.name.match(/[a-z]+/g)?.[0];
-      if (type) {
-        newArg = j.callExpression(
-          j.memberExpression(
-            j.memberExpression(j.identifier("t"), j.identifier("arg")),
-            j.identifier(type)
-          ),
-          params.length ? [j.objectExpression(params)] : []
+      if (val.callee.name === "arg") {
+        const argConfig = val.arguments?.[0];
+        const argConfigProperties =
+          argConfig?.type === "ObjectExpression"
+            ? [...argConfig.properties]
+            : [];
+
+        const argConfigWithoutRequired = argConfigProperties.filter(
+          property => property.key?.name !== "required"
         );
-      } else {
-        params.unshift(j.property("init", j.identifier("type"), val));
+
+        const mergedArgConfig = [
+          ...argConfigWithoutRequired,
+          ...params.filter(property => property.key?.name === "required")
+        ];
+
         newArg = j.callExpression(
           j.memberExpression(j.identifier("t"), j.identifier("arg")),
-          [j.objectExpression(params)]
+          mergedArgConfig.length ? [j.objectExpression(mergedArgConfig)] : []
         );
+      } else {
+        const type = val.callee.name.match(/[a-z]+/g)?.[0];
+        if (type) {
+          newArg = j.callExpression(
+            j.memberExpression(
+              j.memberExpression(j.identifier("t"), j.identifier("arg")),
+              j.identifier(type)
+            ),
+            params.length ? [j.objectExpression(params)] : []
+          );
+        } else {
+          params.unshift(j.property("init", j.identifier("type"), val));
+          newArg = j.callExpression(
+            j.memberExpression(j.identifier("t"), j.identifier("arg")),
+            [j.objectExpression(params)]
+          );
+        }
       }
     } else {
       params.unshift(j.property("init", j.identifier("type"), val));
