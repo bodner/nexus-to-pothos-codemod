@@ -334,6 +334,16 @@ const transform: Transform = (file, api) => {
     return j.property("init", j.identifier(argName), newArg);
   };
 
+  const transformArgsPropertyIfPresent = properties => {
+    const argsProperty = properties.find(
+      property => property.key?.name === "args"
+    );
+    if (argsProperty?.value?.type === "ObjectExpression") {
+      argsProperty.value.properties =
+        argsProperty.value.properties.map(transformArgProperty);
+    }
+  };
+
   const upsertObjectProperty = (properties, keyName, valueNode) => {
     const nextProperty = j.property("init", j.identifier(keyName), valueNode);
     const index = properties.findIndex(
@@ -982,6 +992,7 @@ const transform: Transform = (file, api) => {
               } else {
                 return node;
               }
+              transformArgsPropertyIfPresent(props);
               props.unshift(
                 hasList
                   ? createFieldNullableProperty(
@@ -997,6 +1008,7 @@ const transform: Transform = (file, api) => {
             ) {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
+              transformArgsPropertyIfPresent(props);
               props.unshift(
                 hasList
                   ? createFieldNullableProperty(
@@ -1026,6 +1038,7 @@ const transform: Transform = (file, api) => {
           let propertyName;
           let type;
           let resolve;
+          let argsProperty;
           if (
             functionName === "field" &&
             node.expression.arguments[0].type === "ObjectExpression"
@@ -1038,6 +1051,9 @@ const transform: Transform = (file, api) => {
             ).value;
             resolve = node.expression.arguments[0].properties.find(
               p => p.key.name === "resolve"
+            );
+            argsProperty = node.expression.arguments[0].properties.find(
+              p => p.key.name === "args"
             );
           } else if (functionName === "field") {
             if (node.expression.arguments[1]?.type !== "ObjectExpression") {
@@ -1053,6 +1069,9 @@ const transform: Transform = (file, api) => {
             type = typeProperty.value;
             resolve = node.expression.arguments[1].properties.find(
               p => p.key.name === "resolve"
+            );
+            argsProperty = node.expression.arguments[1].properties.find(
+              p => p.key.name === "args"
             );
           } else {
             propertyName = node.expression.arguments[0];
@@ -1142,6 +1161,11 @@ const transform: Transform = (file, api) => {
           }
           if (resolve) {
             objectProps.push(resolve);
+          }
+          if (argsProperty?.value?.type === "ObjectExpression") {
+            argsProperty.value.properties =
+              argsProperty.value.properties.map(transformArgProperty);
+            objectProps.push(argsProperty);
           }
           if (objectProps.length) {
             functionArguments.push(j.objectExpression(objectProps));
