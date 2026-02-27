@@ -1,4 +1,4 @@
-import { builder } from "#/schema/builder.js";
+import { builder } from "@/schema/builder.js";
 
 import {
   DeviceWithNullableUser,
@@ -233,6 +233,17 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
             },
           })
           .user()
+    })
+
+    hasPrivilege: t.boolean({
+      nullable: false,
+      args: {
+        privilegeId: t.arg.string({
+          required: true
+        }),
+      },
+
+      resolve: (user, {privilegeId}) => userHasPrivilege(user.id, privilegeId as PrivilegeId)
     })
   })
 });

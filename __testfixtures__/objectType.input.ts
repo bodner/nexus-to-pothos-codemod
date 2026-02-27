@@ -152,5 +152,12 @@ export const DeviceWithNullableUser = objectType({
           })
           .user()
     });
+
+    t.nonNull.boolean('hasPrivilege', {
+      args: {
+        privilegeId: nonNull(stringArg()),
+      },
+      resolve: (user, {privilegeId}) => userHasPrivilege(user.id, privilegeId as PrivilegeId),
+    })
   }
 });
