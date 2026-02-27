@@ -701,22 +701,49 @@ const transform: Transform = (file, api) => {
       return p.value;
     }
 
-    const name = j(firstArgument)
-      .find(j.ObjectProperty, {
-        key: { type: "Identifier", name: "name" }
-      })
-      .nodes()[0].value;
+    const objectProperties = firstArgument.properties.filter(
+      property => property.type === "ObjectProperty"
+    );
 
-    const members = j(firstArgument)
-      .find(j.ObjectProperty, {
-        key: { type: "Identifier", name: "members" }
-      })
-      .nodes()[0].value;
+    const getObjectPropertyByName = keyName =>
+      objectProperties.find(property => {
+        const key = property.key;
+        return (
+          (key?.type === "Identifier" && key.name === keyName) ||
+          (key?.type === "StringLiteral" && key.value === keyName)
+        );
+      });
 
-    return statement`builder.enumType(${name}, {
+    const nameProperty = getObjectPropertyByName("name");
+    const membersProperty = getObjectPropertyByName("members");
+
+    if (!nameProperty?.value || !membersProperty?.value) {
+      return p.value;
+    }
+
+    const name = nameProperty.value;
+    const members = membersProperty.value;
+
+    if (members.type === "Identifier") {
+      return j.template.expression`builder.enumType(${members}, {
+  name: ${name},
+})`;
+    }
+
+    if (members.type === "ObjectExpression") {
+      const memberValues = members.properties
+        .filter(property => property.type === "ObjectProperty")
+        .map(property => property.value);
+      return j.template.expression`builder.enumType(${name}, {
+  values: ${j.arrayExpression(memberValues)} as const
+})`;
+    }
+
+    return j.template.expression`builder.enumType(${name}, {
   values: ${members} as const
 })`;
   });
+
   queriesMutations.replaceWith(p => {
     const functionName = p.value.callee.name;
     const args = p.value.arguments;
