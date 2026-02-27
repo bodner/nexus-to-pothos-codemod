@@ -9,7 +9,8 @@ import {
 } from "@prisma/client";
 
 export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType')
-  .implement({
+
+SomeObjectType.implement({
   interfaces: [SomeType1],
 
   fields: t => ({
@@ -66,7 +67,8 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
 });
 
 export const Interface = builder.interfaceRef<SomeType1>('SomeType1')
-  .implement({
+
+Interface.implement({
   fields: t => ({
     id: t.id(),
     stringField: t.string(),
@@ -96,7 +98,8 @@ export const Input = builder.inputType('Input', {
 });
 
 export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjectType')
-  .implement({
+
+RandomObjectType.implement({
   fields: t => ({
     listOfNullableBooleans: t.booleanList({
       nullable: {
@@ -130,7 +133,8 @@ export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjec
 });
 
 export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType')
-  .implement({
+
+ListObjectType.implement({
   fields: t => ({
     departments: t.field({
       type: [GraphQLDepartment],
@@ -192,7 +196,8 @@ export const InputWithField = builder.inputType('InputWithField', {
 });
 
 export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
-  .implement({
+
+DeviceWithUser.implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId', {
       nullable: false
@@ -215,7 +220,8 @@ export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser'
 });
 
 export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
-  .implement({
+
+DeviceWithNullableUser.implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId', {
       nullable: false
@@ -233,17 +239,36 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
             },
           })
           .user()
-    })
+    }),
 
     hasPrivilege: t.boolean({
       nullable: false,
+
       args: {
         privilegeId: t.arg.string({
           required: true
-        }),
+        })
       },
 
       resolve: (user, {privilegeId}) => userHasPrivilege(user.id, privilegeId as PrivilegeId)
+    }),
+
+    lastLogin: t.field({
+      nullable: true,
+      type: "DateTime",
+      resolve: (user) => user.lastLogin
+    }),
+
+    createdAt: t.field({
+      type: "DateTime",
+      nullable: true,
+      resolve: obj => obj.createdAt
+    }),
+
+    randomDate: t.field({
+      type: 'DateTime',
+      nullable: false,
+      resolve: obj => obj.randomDate
     })
   })
 });

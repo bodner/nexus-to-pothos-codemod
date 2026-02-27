@@ -27,6 +27,10 @@ function isValidTypeIdentifier(name: string) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name);
 }
 
+function isDateTimeMethodName(name: string) {
+  return typeof name === "string" && name.toLowerCase() === "datetime";
+}
+
 const transform: Transform = (file, api) => {
   const j = api.jscodeshift;
   const { statement } = j.template;
@@ -95,6 +99,28 @@ const transform: Transform = (file, api) => {
   };
 
   const objectRefTypeImportNames = new Set<string>();
+
+  const isDateTimeTypeNode = typeNode => {
+    if (typeNode?.type === "StringLiteral") {
+      return typeNode.value === "DateTime";
+    }
+    if (typeNode?.type === "Identifier") {
+      return typeNode.name === "DateTime";
+    }
+    return false;
+  };
+
+  const createDefaultResolver = fieldName => {
+    const rootIdentifier = j.identifier("obj");
+    const memberAccess = isValidTypeIdentifier(fieldName)
+      ? j.memberExpression(rootIdentifier, j.identifier(fieldName))
+      : j.memberExpression(rootIdentifier, j.stringLiteral(fieldName), true);
+    return j.property(
+      "init",
+      j.identifier("resolve"),
+      j.arrowFunctionExpression([rootIdentifier], memberAccess)
+    );
+  };
 
   const argHelperTypeMap = {
     idArg: "ID",
@@ -1008,6 +1034,21 @@ const transform: Transform = (file, api) => {
             ) {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
+              if (isDateTimeMethodName(transformedFunctionName)) {
+                transformedFunctionName = "field";
+                if (!props.some(p => p.key?.name === "type")) {
+                  props.unshift(
+                    j.property(
+                      "init",
+                      j.identifier("type"),
+                      j.stringLiteral("DateTime")
+                    )
+                  );
+                }
+                if (!props.some(p => p.key?.name === "resolve")) {
+                  props.push(createDefaultResolver(name));
+                }
+              }
               transformArgsPropertyIfPresent(props);
               props.unshift(
                 hasList
@@ -1082,24 +1123,34 @@ const transform: Transform = (file, api) => {
           }
           let exposeName;
           const functionArguments = [];
+          const isDateTimeField =
+            functionName === "field" && isDateTimeTypeNode(type);
+          const isDateTimeMethod =
+            functionName !== "field" && isDateTimeMethodName(functionName);
           if (functionName === "field") {
-            if (resolve) {
+            if (resolve || isDateTimeField) {
               exposeName = "field";
             } else {
               exposeName = "expose";
               functionArguments.push(propertyName);
             }
           } else {
-            exposeName = `expose${capitalizeFirstLetter(type === "id" ? "ID" : type)}`;
-            functionArguments.push(propertyName);
+            if (isDateTimeMethod) {
+              exposeName = "field";
+            } else {
+              exposeName = `expose${capitalizeFirstLetter(type === "id" ? "ID" : type)}`;
+              functionArguments.push(propertyName);
+            }
           }
           const objectProps = [];
           let hasListTypeWrapper = false;
           let listItemRequired: boolean | null = null;
           let explicitTypeNullable: boolean | null = null;
-          if (functionName === "field") {
+          if (functionName === "field" || isDateTimeMethod) {
             const normalizedType = unwrapTypeNullability(type);
-            let finalType = normalizedType.type;
+            let finalType = isDateTimeMethod
+              ? j.stringLiteral("DateTime")
+              : normalizedType.type;
             explicitTypeNullable = normalizedType.explicitNullable;
             if (
               hasList ||
@@ -1161,6 +1212,8 @@ const transform: Transform = (file, api) => {
           }
           if (resolve) {
             objectProps.push(resolve);
+          } else if (isDateTimeField || isDateTimeMethod) {
+            objectProps.push(createDefaultResolver(propertyName.value));
           }
           if (argsProperty?.value?.type === "ObjectExpression") {
             argsProperty.value.properties =

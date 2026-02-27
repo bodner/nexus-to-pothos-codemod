@@ -159,5 +159,13 @@ export const DeviceWithNullableUser = objectType({
       },
       resolve: (user, {privilegeId}) => userHasPrivilege(user.id, privilegeId as PrivilegeId),
     })
+
+    t.nullable.datetime('lastLogin', {
+      resolve: (user) => user.lastLogin,
+    })
+    t.nullable.datetime('createdAt')
+
+    t.nonNull.field('randomDate', {type: 'DateTime'})
+
   }
 });
