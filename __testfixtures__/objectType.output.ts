@@ -9,8 +9,7 @@ import {
 } from "@prisma/client";
 
 export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType')
-
-SomeObjectType.implement({
+  .implement({
   interfaces: [SomeType1],
 
   fields: t => ({
@@ -67,8 +66,7 @@ SomeObjectType.implement({
 });
 
 export const Interface = builder.interfaceRef<SomeType1>('SomeType1')
-
-Interface.implement({
+  .implement({
   fields: t => ({
     id: t.id(),
     stringField: t.string(),
@@ -98,8 +96,7 @@ export const Input = builder.inputType('Input', {
 });
 
 export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjectType')
-
-RandomObjectType.implement({
+  .implement({
   fields: t => ({
     listOfNullableBooleans: t.booleanList({
       nullable: {
@@ -133,8 +130,7 @@ RandomObjectType.implement({
 });
 
 export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType')
-
-ListObjectType.implement({
+  .implement({
   fields: t => ({
     departments: t.field({
       type: [GraphQLDepartment],
@@ -196,8 +192,7 @@ export const InputWithField = builder.inputType('InputWithField', {
 });
 
 export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
-
-DeviceWithUser.implement({
+  .implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId', {
       nullable: false
@@ -220,8 +215,7 @@ DeviceWithUser.implement({
 });
 
 export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
-
-DeviceWithNullableUser.implement({
+  .implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId', {
       nullable: false
@@ -265,10 +259,34 @@ DeviceWithNullableUser.implement({
       resolve: obj => obj.createdAt
     }),
 
+    lastSeenAt: t.field({
+      type: "Timestamp",
+      nullable: true,
+      resolve: obj => obj.lastSeenAt
+    }),
+
+    birthday: t.field({
+      type: "Date",
+      nullable: false,
+      resolve: obj => obj.birthday
+    }),
+
     randomDate: t.field({
       type: 'DateTime',
       nullable: false,
       resolve: obj => obj.randomDate
+    }),
+
+    processedAt: t.field({
+      type: 'Timestamp',
+      nullable: false,
+      resolve: obj => obj.processedAt
+    }),
+
+    nationalHoliday: t.field({
+      type: 'Date',
+      nullable: true,
+      resolve: obj => obj.nationalHoliday
     })
   })
 });

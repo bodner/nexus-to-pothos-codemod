@@ -27,8 +27,21 @@ function isValidTypeIdentifier(name: string) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name);
 }
 
-function isDateTimeMethodName(name: string) {
-  return typeof name === "string" && name.toLowerCase() === "datetime";
+const specialScalarMethodToTypeMap = {
+  datetime: "DateTime",
+  timestamp: "Timestamp",
+  date: "Date"
+} as const;
+
+const specialScalarTypes = new Set<string>(
+  Object.values(specialScalarMethodToTypeMap)
+);
+
+function getSpecialScalarTypeFromMethodName(name: string) {
+  if (typeof name !== "string") {
+    return null;
+  }
+  return specialScalarMethodToTypeMap[name.toLowerCase()] ?? null;
 }
 
 const transform: Transform = (file, api) => {
@@ -100,14 +113,14 @@ const transform: Transform = (file, api) => {
 
   const objectRefTypeImportNames = new Set<string>();
 
-  const isDateTimeTypeNode = typeNode => {
+  const getSpecialScalarTypeFromTypeNode = typeNode => {
     if (typeNode?.type === "StringLiteral") {
-      return typeNode.value === "DateTime";
+      return specialScalarTypes.has(typeNode.value) ? typeNode.value : null;
     }
     if (typeNode?.type === "Identifier") {
-      return typeNode.name === "DateTime";
+      return specialScalarTypes.has(typeNode.name) ? typeNode.name : null;
     }
-    return false;
+    return null;
   };
 
   const createDefaultResolver = fieldName => {
@@ -1034,14 +1047,17 @@ const transform: Transform = (file, api) => {
             ) {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
-              if (isDateTimeMethodName(transformedFunctionName)) {
+              const specialScalarType = getSpecialScalarTypeFromMethodName(
+                transformedFunctionName
+              );
+              if (specialScalarType) {
                 transformedFunctionName = "field";
                 if (!props.some(p => p.key?.name === "type")) {
                   props.unshift(
                     j.property(
                       "init",
                       j.identifier("type"),
-                      j.stringLiteral("DateTime")
+                      j.stringLiteral(specialScalarType)
                     )
                   );
                 }
@@ -1123,19 +1139,25 @@ const transform: Transform = (file, api) => {
           }
           let exposeName;
           const functionArguments = [];
-          const isDateTimeField =
-            functionName === "field" && isDateTimeTypeNode(type);
-          const isDateTimeMethod =
-            functionName !== "field" && isDateTimeMethodName(functionName);
+          const specialScalarTypeFromField =
+            functionName === "field"
+              ? getSpecialScalarTypeFromTypeNode(type)
+              : null;
+          const specialScalarTypeFromMethod =
+            functionName !== "field"
+              ? getSpecialScalarTypeFromMethodName(functionName)
+              : null;
+          const isSpecialScalarField = Boolean(specialScalarTypeFromField);
+          const isSpecialScalarMethod = Boolean(specialScalarTypeFromMethod);
           if (functionName === "field") {
-            if (resolve || isDateTimeField) {
+            if (resolve || isSpecialScalarField) {
               exposeName = "field";
             } else {
               exposeName = "expose";
               functionArguments.push(propertyName);
             }
           } else {
-            if (isDateTimeMethod) {
+            if (isSpecialScalarMethod) {
               exposeName = "field";
             } else {
               exposeName = `expose${capitalizeFirstLetter(type === "id" ? "ID" : type)}`;
@@ -1146,10 +1168,10 @@ const transform: Transform = (file, api) => {
           let hasListTypeWrapper = false;
           let listItemRequired: boolean | null = null;
           let explicitTypeNullable: boolean | null = null;
-          if (functionName === "field" || isDateTimeMethod) {
+          if (functionName === "field" || isSpecialScalarMethod) {
             const normalizedType = unwrapTypeNullability(type);
-            let finalType = isDateTimeMethod
-              ? j.stringLiteral("DateTime")
+            let finalType = isSpecialScalarMethod
+              ? j.stringLiteral(specialScalarTypeFromMethod)
               : normalizedType.type;
             explicitTypeNullable = normalizedType.explicitNullable;
             if (
@@ -1212,7 +1234,7 @@ const transform: Transform = (file, api) => {
           }
           if (resolve) {
             objectProps.push(resolve);
-          } else if (isDateTimeField || isDateTimeMethod) {
+          } else if (isSpecialScalarField || isSpecialScalarMethod) {
             objectProps.push(createDefaultResolver(propertyName.value));
           }
           if (argsProperty?.value?.type === "ObjectExpression") {

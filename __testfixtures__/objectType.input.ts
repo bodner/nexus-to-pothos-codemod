@@ -164,8 +164,12 @@ export const DeviceWithNullableUser = objectType({
       resolve: (user) => user.lastLogin,
     })
     t.nullable.datetime('createdAt')
+    t.nullable.timestamp('lastSeenAt')
+    t.nonNull.date('birthday')
 
     t.nonNull.field('randomDate', {type: 'DateTime'})
+    t.field('processedAt', {type: 'Timestamp'})
+    t.nullable.field('nationalHoliday', {type: 'Date'})
 
   }
 });
