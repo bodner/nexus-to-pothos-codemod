@@ -13,8 +13,13 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
   interfaces: [SomeType1],
 
   fields: t => ({
-    a: t.exposeID('a'),
-    b: t.exposeFloat('b'),
+    a: t.exposeID('a', {
+      nullable: false
+    }),
+
+    b: t.exposeFloat('b', {
+      nullable: false
+    }),
 
     c: t.exposeFloat('c', {
       nullable: true
@@ -35,6 +40,7 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
 
     f: t.field({
       type: SomeType,
+      nullable: false,
 
       async resolve(rootObject: any, args, ctx) {
         return ctx.smthng();
@@ -42,11 +48,18 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
     }),
 
     g: t.float({
+      nullable: false,
       resolve: () => 1
     }),
 
     h: t.field({
       type: [Type],
+
+      nullable: {
+        list: true,
+        items: true
+      },
+
       resolve: (somthng) => smthng.a()
     })
   })
@@ -59,6 +72,7 @@ export const Interface = builder.interfaceRef<SomeType1>('SomeType1')
     stringField: t.string(),
 
     resolvableField: t.field({
+      nullable: false,
       type: SomeType2,
 
       async resolve(rootObject, args, ctx) {
@@ -85,21 +99,31 @@ export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjec
   .implement({
   fields: t => ({
     listOfNullableBooleans: t.booleanList({
-      required: false,
-      nullable: true,
+      nullable: {
+        list: true,
+        items: true
+      },
+
       resolve: () => [true, null, false]
     }),
 
     nonNullListOfNullableStrings: t.stringList({
-      nullable: false,
-      required: false,
+      nullable: {
+        list: false,
+        items: true
+      },
+
       resolve: () => ['a', null, 'b']
     }),
 
     nonNullListOfNullableObjects: t.field({
       type: [SomeRandomType],
-      required: false,
-      nullable: false,
+
+      nullable: {
+        list: false,
+        items: true
+      },
+
       resolve: () => [new SomeRandomType(), new SomeRandomType()]
     })
   })
@@ -110,8 +134,11 @@ export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType'
   fields: t => ({
     departments: t.field({
       type: [GraphQLDepartment],
-      required: true,
-      nullable: true,
+
+      nullable: {
+        list: true,
+        items: false
+      },
 
       resolve: () => {
         return [
@@ -123,8 +150,11 @@ export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType'
 
     divisions: t.field({
       type: [GraphQLDivision],
-      required: true,
-      nullable: false,
+
+      nullable: {
+        list: false,
+        items: false
+      },
 
       resolve: () => {
         return [
@@ -136,8 +166,11 @@ export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType'
 
     companies: t.field({
       type: [GraphQLCompany],
-      required: false,
-      nullable: true,
+
+      nullable: {
+        list: true,
+        items: true
+      },
 
       resolve: () => {
         return [
@@ -152,6 +185,7 @@ export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType'
 export const InputWithField = builder.inputType('InputWithField', {
   fields: t => ({
     departments: t.field({
+      nullable: false,
       type: list(nonNull(GraphQLEmployeeDepartmentOptionalInput))
     })
   })
@@ -160,10 +194,13 @@ export const InputWithField = builder.inputType('InputWithField', {
 export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
   .implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId'),
+    deviceId: t.exposeString('deviceId', {
+      nullable: false
+    }),
 
     user: t.field({
       type: GraphQLUser,
+      nullable: false,
 
       resolve: (device) =>
         prisma.device
@@ -180,7 +217,9 @@ export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser'
 export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
   .implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId'),
+    deviceId: t.exposeString('deviceId', {
+      nullable: false
+    }),
 
     user: t.field({
       type: GraphQLUser,

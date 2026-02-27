@@ -96,6 +96,43 @@ const transform: Transform = (file, api) => {
 
   const objectRefTypeImportNames = new Set<string>();
 
+  const argHelperTypeMap = {
+    idArg: "ID",
+    stringArg: "String",
+    intArg: "Int",
+    floatArg: "Float",
+    booleanArg: "Boolean"
+  };
+
+  const getArgTypeNode = valueNode => {
+    if (valueNode?.type === "Identifier") {
+      return valueNode;
+    }
+
+    if (
+      valueNode?.type === "CallExpression" &&
+      valueNode.callee?.type === "Identifier"
+    ) {
+      if (valueNode.callee.name === "arg") {
+        const argConfig = valueNode.arguments?.[0];
+        if (argConfig?.type === "ObjectExpression") {
+          const typeProperty = argConfig.properties.find(
+            property => property.key?.name === "type"
+          );
+          if (typeProperty?.value) {
+            return typeProperty.value;
+          }
+        }
+      }
+
+      if (argHelperTypeMap[valueNode.callee.name]) {
+        return j.stringLiteral(argHelperTypeMap[valueNode.callee.name]);
+      }
+    }
+
+    return valueNode;
+  };
+
   const transformArgProperty = p => {
     const argName = p.key.name;
     const isNonNullWrapper =
@@ -117,6 +154,63 @@ const transform: Transform = (file, api) => {
       (isNonNullWrapper || isNullableWrapper) && p.value.arguments?.length
         ? p.value.arguments[0]
         : p.value;
+
+    const buildListRequiredObject = (
+      listRequired: boolean,
+      itemsRequired: boolean
+    ) =>
+      j.objectExpression([
+        j.property(
+          "init",
+          j.identifier("list"),
+          j.booleanLiteral(listRequired)
+        ),
+        j.property(
+          "init",
+          j.identifier("items"),
+          j.booleanLiteral(itemsRequired)
+        )
+      ]);
+
+    if (val?.type === "CallExpression" && val.callee?.name === "list") {
+      let listItemType = val.arguments?.[0];
+      let listItemsRequired = false;
+
+      if (
+        listItemType?.type === "CallExpression" &&
+        ["nonNull", "nullable"].includes(listItemType.callee?.name) &&
+        listItemType.arguments?.length
+      ) {
+        listItemsRequired = listItemType.callee.name === "nonNull";
+        listItemType = listItemType.arguments[0];
+      }
+
+      const listRequired = isNonNullWrapper
+        ? true
+        : isNullableWrapper
+          ? false
+          : false;
+
+      const argType = getArgTypeNode(listItemType);
+      const listArgConfig = [
+        j.property("init", j.identifier("type"), j.arrayExpression([argType])),
+        j.property(
+          "init",
+          j.identifier("required"),
+          buildListRequiredObject(listRequired, listItemsRequired)
+        )
+      ];
+
+      return j.property(
+        "init",
+        j.identifier(argName),
+        j.callExpression(
+          j.memberExpression(j.identifier("t"), j.identifier("arg")),
+          [j.objectExpression(listArgConfig)]
+        )
+      );
+    }
+
     let newArg;
     if (val?.type === "Identifier") {
       params.unshift(j.property("init", j.identifier("type"), val));
@@ -140,6 +234,64 @@ const transform: Transform = (file, api) => {
           argConfig?.type === "ObjectExpression"
             ? [...argConfig.properties]
             : [];
+
+        const typeProperty = argConfigProperties.find(
+          property => property.key?.name === "type"
+        );
+        const requiredProperty = argConfigProperties.find(
+          property => property.key?.name === "required"
+        );
+
+        const isListType =
+          typeProperty?.value?.type === "CallExpression" &&
+          typeProperty.value.callee?.name === "list";
+
+        if (isListType) {
+          let listItemType = typeProperty.value.arguments?.[0];
+          let listItemsRequired = false;
+          if (
+            listItemType?.type === "CallExpression" &&
+            ["nonNull", "nullable"].includes(listItemType.callee?.name) &&
+            listItemType.arguments?.length
+          ) {
+            listItemsRequired = listItemType.callee.name === "nonNull";
+            listItemType = listItemType.arguments[0];
+          }
+
+          let listRequired = false;
+          if (isNonNullWrapper) {
+            listRequired = true;
+          } else if (isNullableWrapper) {
+            listRequired = false;
+          } else if (requiredProperty?.value?.type === "BooleanLiteral") {
+            listRequired = requiredProperty.value.value;
+          }
+
+          const listArgConfigProperties = argConfigProperties.filter(
+            property => !["type", "required"].includes(property.key?.name)
+          );
+          listArgConfigProperties.unshift(
+            j.property(
+              "init",
+              j.identifier("type"),
+              j.arrayExpression([getArgTypeNode(listItemType)])
+            )
+          );
+          listArgConfigProperties.push(
+            j.property(
+              "init",
+              j.identifier("required"),
+              buildListRequiredObject(listRequired, listItemsRequired)
+            )
+          );
+
+          newArg = j.callExpression(
+            j.memberExpression(j.identifier("t"), j.identifier("arg")),
+            [j.objectExpression(listArgConfigProperties)]
+          );
+
+          return j.property("init", j.identifier(argName), newArg);
+        }
 
         const argConfigWithoutRequired = argConfigProperties.filter(
           property => property.key?.name !== "required"
@@ -245,6 +397,37 @@ const transform: Transform = (file, api) => {
     };
   };
 
+  const createFieldNullableProperty = (
+    isList: boolean,
+    listNullable: boolean,
+    itemsNullable: boolean
+  ) => {
+    if (!isList) {
+      return j.property(
+        "init",
+        j.identifier("nullable"),
+        j.booleanLiteral(listNullable)
+      );
+    }
+
+    return j.property(
+      "init",
+      j.identifier("nullable"),
+      j.objectExpression([
+        j.property(
+          "init",
+          j.identifier("list"),
+          j.booleanLiteral(listNullable)
+        ),
+        j.property(
+          "init",
+          j.identifier("items"),
+          j.booleanLiteral(itemsNullable)
+        )
+      ])
+    );
+  };
+
   const transformRootFieldCall = call => {
     if (call.callee.type !== "MemberExpression") {
       return null;
@@ -321,31 +504,21 @@ const transform: Transform = (file, api) => {
         property => property.key?.name === "authScopes"
       );
 
-      const shouldSetRequired = normalizedType.hasList;
-      const requiredValue =
-        wrapperRequired ??
-        normalizedType.required ??
-        (shouldSetRequired ? false : null);
-      const requiredProperty =
-        typeof requiredValue === "boolean"
-          ? j.property(
-              "init",
-              j.identifier("required"),
-              j.booleanLiteral(requiredValue)
-            )
-          : null;
-
-      const shouldSetNullable =
-        effectiveNullable !== null ||
-        normalizedType.hasList ||
-        normalizedType.required !== null;
-      const nullableProperty = shouldSetNullable
-        ? j.property(
-            "init",
-            j.identifier("nullable"),
-            j.booleanLiteral(effectiveNullable ?? true)
-          )
-        : null;
+      const isListField = normalizedType.hasList;
+      const listNullable = effectiveNullable ?? (isListField ? true : false);
+      const itemsNullable =
+        wrapperRequired !== null
+          ? !wrapperRequired
+          : normalizedType.required !== null
+            ? !normalizedType.required
+            : isListField
+              ? true
+              : false;
+      const nullableProperty = createFieldNullableProperty(
+        isListField,
+        listNullable,
+        itemsNullable
+      );
 
       const extraProperties = configProps.filter(
         property =>
@@ -363,7 +536,6 @@ const transform: Transform = (file, api) => {
       const fieldConfigProperties = [
         typeProperty,
         nullableProperty,
-        requiredProperty,
         argsProperty,
         authScopesProperty,
         ...extraProperties,
@@ -388,29 +560,18 @@ const transform: Transform = (file, api) => {
       property => property.key?.name === "authScopes"
     );
 
-    const requiredValue = hasListWrapper ? (wrapperRequired ?? false) : null;
-    const requiredProperty =
-      typeof requiredValue === "boolean"
-        ? j.property(
-            "init",
-            j.identifier("required"),
-            j.booleanLiteral(requiredValue)
-          )
-        : null;
-
-    const nullableValue = hasListWrapper
-      ? (explicitNullable ?? true)
-      : explicitNullable !== null
-        ? explicitNullable
-        : null;
-    const nullableProperty =
-      typeof nullableValue === "boolean"
-        ? j.property(
-            "init",
-            j.identifier("nullable"),
-            j.booleanLiteral(nullableValue)
-          )
-        : null;
+    const isListField = hasListWrapper;
+    const listNullable = explicitNullable ?? (isListField ? true : false);
+    const itemsNullable = isListField
+      ? wrapperRequired !== null
+        ? !wrapperRequired
+        : true
+      : false;
+    const nullableProperty = createFieldNullableProperty(
+      isListField,
+      listNullable,
+      itemsNullable
+    );
 
     const extraProperties = configProps.filter(
       property =>
@@ -426,7 +587,6 @@ const transform: Transform = (file, api) => {
 
     const methodConfigProps = [
       nullableProperty,
-      requiredProperty,
       argsProperty,
       authScopesProperty,
       ...extraProperties,
@@ -529,18 +689,35 @@ const transform: Transform = (file, api) => {
     const normalizedType = unwrapTypeNullability(typeProperty.value);
     typeProperty.value = normalizedType.type;
     const isNullable = normalizedType.explicitNullable === true;
+    let isListType = false;
+    let listItemsNullable = true;
     if (
       typeProperty.value.type === "CallExpression" &&
       typeProperty.value.callee.name === "list"
     ) {
-      typeProperty.value = j.arrayExpression([typeProperty.value.arguments[0]]);
+      isListType = true;
+      let listType = typeProperty.value.arguments[0];
+      if (
+        listType?.type === "CallExpression" &&
+        ["nonNull", "nullable"].includes(listType.callee?.name) &&
+        listType.arguments?.length
+      ) {
+        listItemsNullable = listType.callee.name !== "nonNull";
+        listType = listType.arguments[0];
+      }
+      typeProperty.value = j.arrayExpression([listType]);
     }
+
+    const nullableProperty = createFieldNullableProperty(
+      isListType,
+      isListType ? isNullable : isNullable,
+      isListType ? listItemsNullable : false
+    );
+
     return statement`builder.${functionName}(${j.stringLiteral(name)}, t => t.field(${j.objectExpression(
       [
         typeProperty,
-        isNullable
-          ? j.property("init", j.identifier("nullable"), j.booleanLiteral(true))
-          : null,
+        nullableProperty,
         config.properties.find(p => p.key.name === "args"),
         auth,
         config.properties.find(p => p.key.name === "resolve")
@@ -706,9 +883,11 @@ const transform: Transform = (file, api) => {
     return statement`builder.${functionName}(${j.stringLiteral(name)}, t => t.connection(${j.objectExpression(
       [
         typeProperty,
-        isNullable
-          ? j.property("init", j.identifier("nullable"), j.booleanLiteral(true))
-          : null,
+        j.property(
+          "init",
+          j.identifier("nullable"),
+          j.booleanLiteral(isNullable)
+        ),
         additionalArgs,
         auth ? auth : null,
         nodes
@@ -736,14 +915,37 @@ const transform: Transform = (file, api) => {
         try {
           const functionName = node.expression.callee.property.name;
           const memberChain = getMemberChain(node.expression.callee);
-          const hasList = memberChain.includes("list");
-          const hasNonNull = memberChain.includes("nonNull");
-          const hasNullable = memberChain.includes("nullable");
+          const wrappers = memberChain.slice(1, -1);
+          const listIndex = wrappers.indexOf("list");
+          const hasList = listIndex >= 0;
+          const outerWrappers = hasList
+            ? wrappers.slice(0, listIndex)
+            : wrappers;
+          const innerWrappers = hasList ? wrappers.slice(listIndex + 1) : [];
+          const hasOuterNonNull = outerWrappers.includes("nonNull");
+          const hasOuterNullable = outerWrappers.includes("nullable");
+          const hasInnerNonNull = innerWrappers.includes("nonNull");
+          const hasInnerNullable = innerWrappers.includes("nullable");
+
+          const fieldNullable = hasOuterNonNull
+            ? false
+            : hasOuterNullable
+              ? true
+              : false;
+          const listNullable = hasOuterNonNull
+            ? false
+            : hasOuterNullable
+              ? true
+              : true;
+          const listItemsNullable = hasInnerNonNull
+            ? false
+            : hasInnerNullable
+              ? true
+              : true;
           if (functionName === "implements") {
             implementsInterfaces.push(node.expression.arguments[0].name);
             return null;
           }
-          const isNullable = hasList ? !hasNonNull : hasNullable;
           if (
             objectType === "interfaceRef" ||
             objectType === "inputType" ||
@@ -780,48 +982,30 @@ const transform: Transform = (file, api) => {
               } else {
                 return node;
               }
-              if (isNullable) {
-                props.unshift(
-                  j.property(
-                    "init",
-                    j.identifier("nullable"),
-                    j.booleanLiteral(true)
-                  )
-                );
-              }
+              props.unshift(
+                hasList
+                  ? createFieldNullableProperty(
+                      true,
+                      listNullable,
+                      listItemsNullable
+                    )
+                  : createFieldNullableProperty(false, fieldNullable, false)
+              );
               args.push(j.objectExpression(props));
             } else if (
               node.expression.arguments[1]?.type === "ObjectExpression"
             ) {
               name = node.expression.arguments[0].value;
               const props = [...node.expression.arguments[1].properties];
-              if (isNullable) {
-                props.unshift(
-                  j.property(
-                    "init",
-                    j.identifier("nullable"),
-                    j.booleanLiteral(true)
-                  )
-                );
-              }
-              if (hasList) {
-                props.unshift(
-                  j.property(
-                    "init",
-                    j.identifier("required"),
-                    j.booleanLiteral(false)
-                  )
-                );
-                if (!isNullable) {
-                  props.unshift(
-                    j.property(
-                      "init",
-                      j.identifier("nullable"),
-                      j.booleanLiteral(false)
+              props.unshift(
+                hasList
+                  ? createFieldNullableProperty(
+                      true,
+                      listNullable,
+                      listItemsNullable
                     )
-                  );
-                }
-              }
+                  : createFieldNullableProperty(false, fieldNullable, false)
+              );
               args.push(j.objectExpression(props));
             } else {
               name = node.expression.arguments[0].value;
@@ -924,57 +1108,36 @@ const transform: Transform = (file, api) => {
             );
             if (hasList) {
               objectProps.push(
-                j.property(
-                  "init",
-                  j.identifier("required"),
-                  j.booleanLiteral(false)
-                )
-              );
-              objectProps.push(
-                j.property(
-                  "init",
-                  j.identifier("nullable"),
-                  j.booleanLiteral(!hasNonNull)
+                createFieldNullableProperty(
+                  true,
+                  listNullable,
+                  listItemsNullable
                 )
               );
             } else if (hasListTypeWrapper) {
-              if (typeof listItemRequired === "boolean") {
-                objectProps.push(
-                  j.property(
-                    "init",
-                    j.identifier("required"),
-                    j.booleanLiteral(listItemRequired)
-                  )
-                );
-              }
               const listNullableValue =
                 explicitTypeNullable ??
-                (hasNonNull ? false : hasNullable ? true : true);
-              if (
-                explicitTypeNullable !== null ||
+                (hasOuterNonNull ? false : hasOuterNullable ? true : true);
+              const listItemsNullableValue =
                 typeof listItemRequired === "boolean"
-              ) {
-                objectProps.push(
-                  j.property(
-                    "init",
-                    j.identifier("nullable"),
-                    j.booleanLiteral(listNullableValue)
-                  )
-                );
-              }
+                  ? !listItemRequired
+                  : true;
+              objectProps.push(
+                createFieldNullableProperty(
+                  true,
+                  listNullableValue,
+                  listItemsNullableValue
+                )
+              );
             }
           }
-          if (
-            (isNullable || explicitTypeNullable) &&
-            !hasList &&
-            !hasListTypeWrapper
-          ) {
+          if (!hasList && !hasListTypeWrapper) {
+            const nullableValue =
+              explicitTypeNullable !== null
+                ? explicitTypeNullable
+                : fieldNullable;
             objectProps.push(
-              j.property(
-                "init",
-                j.identifier("nullable"),
-                j.booleanLiteral(true)
-              )
+              createFieldNullableProperty(false, nullableValue, false)
             );
           }
           if (resolve) {

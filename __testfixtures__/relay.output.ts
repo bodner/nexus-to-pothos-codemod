@@ -1,6 +1,7 @@
 import { builder } from "#/schema/builder.js";
 export const relayList = builder.queryField("relayList", t => t.connection({
   type: SomeType,
+  nullable: false,
 
   args: {
     id: nonNull(idArg())
@@ -19,3 +20,4 @@ export const relayList = builder.queryField("relayList", t => t.connection({
     });
   }
 }));
+

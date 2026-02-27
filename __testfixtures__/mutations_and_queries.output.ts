@@ -1,6 +1,7 @@
 import { builder } from "#/schema/builder.js";
 export const doThings = builder.mutationField("doThings", t => t.field({
   type: SomeType,
+  nullable: false,
 
   args: {
     id: t.arg.id({
@@ -20,6 +21,7 @@ export const doThings = builder.mutationField("doThings", t => t.field({
 
 export const otherStuff = builder.mutationField("otherStuff", t => t.field({
   type: OtherType,
+  nullable: false,
 
   args: {
     id: t.arg.id({
@@ -36,6 +38,11 @@ export const otherStuff = builder.mutationField("otherStuff", t => t.field({
 
 export const otherStuff2 = builder.queryField("someQuery", t => t.field({
   type: [OtherType],
+
+  nullable: {
+    list: false,
+    items: true
+  },
 
   args: {
     id: t.arg.id({
@@ -54,7 +61,11 @@ export const otherStuff2 = builder.queryField("someQuery", t => t.field({
 
 export const otherStuff3 = builder.queryField("someQuery", t => t.field({
   type: [OtherType],
-  nullable: true,
+
+  nullable: {
+    list: true,
+    items: true
+  },
 
   args: {
     id: t.arg.id({
@@ -142,6 +153,7 @@ export const EmployeeMutations = builder.mutationType({
 
     archiveEmployee: t.field({
       type: GraphQLEmployee,
+      nullable: false,
 
       args: {
         id: t.arg.id({
@@ -155,8 +167,11 @@ export const EmployeeMutations = builder.mutationType({
 
     privileges: t.field({
       type: [GraphQLPrivilege],
-      nullable: false,
-      required: true,
+
+      nullable: {
+        list: false,
+        items: false
+      },
 
       args: {
         filter: t.arg({
@@ -171,3 +186,4 @@ export const EmployeeMutations = builder.mutationType({
     })
   })
 });
+
