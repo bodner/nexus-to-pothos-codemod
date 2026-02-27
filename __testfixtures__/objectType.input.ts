@@ -1,3 +1,5 @@
+import { objectType, interfaceType, inputObjectType, nonNull, nullable, list } from 'nexus';
+
 export const SomeObjectType = objectType({
   name: 'SomeObjectType',
   definition(t) {

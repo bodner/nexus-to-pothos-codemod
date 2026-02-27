@@ -1223,7 +1223,7 @@ const transform: Transform = (file, api) => {
       })
       .size() > 0;
   if (usesBuilder && !hasLocalImportBinding("builder")) {
-    upsertNamedImport("#/schema/builder.js", ["builder"]);
+    upsertNamedImport("@/schema/builder.js", ["builder"]);
   }
 
   const objectRefTypeImports = new Set<string>(objectRefTypeImportNames);
@@ -1254,6 +1254,11 @@ const transform: Transform = (file, api) => {
   if (objectRefTypeImports.size > 0) {
     upsertNamedImport("@prisma/client", [...objectRefTypeImports].sort());
   }
+
+  root
+    .find(j.ImportDeclaration)
+    .filter(path => path.value.source?.value === "nexus")
+    .remove();
 
   return root.toSource();
 };
