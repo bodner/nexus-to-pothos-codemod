@@ -1,4 +1,5 @@
 import { Transform } from "jscodeshift/src/core";
+import path from "path";
 
 function capitalizeFirstLetter(string: string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
@@ -48,6 +49,37 @@ const transform: Transform = (file, api) => {
   const j = api.jscodeshift;
   const { statement } = j.template;
   const root = j(file.source);
+
+  const toPosixPath = (value: string) => value.replace(/\\/g, "/");
+
+  const toRelativeImportPath = (fromFilePath: string, toFilePath: string) => {
+    const relativePath = toPosixPath(
+      path.relative(path.dirname(fromFilePath), toFilePath)
+    );
+    return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
+  };
+
+  const getBuilderImportSource = (sourceFilePath?: string) => {
+    if (!sourceFilePath) {
+      return "@/schema/builder.js";
+    }
+
+    const normalizedSourcePath = toPosixPath(path.resolve(sourceFilePath));
+    const apiSrcMarker = "/api/src/";
+    const apiSrcIndex = normalizedSourcePath.lastIndexOf(apiSrcMarker);
+
+    if (apiSrcIndex < 0) {
+      return "@/schema/builder.js";
+    }
+
+    const apiSrcRoot = normalizedSourcePath.slice(
+      0,
+      apiSrcIndex + apiSrcMarker.length - 1
+    );
+    const builderFilePath = `${apiSrcRoot}/schema/builder.js`;
+
+    return toRelativeImportPath(normalizedSourcePath, builderFilePath);
+  };
 
   const upsertNamedImport = (source: string, importNames: string[]) => {
     if (!importNames.length) {
@@ -1349,7 +1381,7 @@ const transform: Transform = (file, api) => {
       })
       .size() > 0;
   if (usesBuilder && !hasLocalImportBinding("builder")) {
-    upsertNamedImport("@/schema/builder.js", ["builder"]);
+    upsertNamedImport(getBuilderImportSource(file.path), ["builder"]);
   }
 
   const objectRefTypeImports = new Set<string>(objectRefTypeImportNames);
