@@ -31,7 +31,9 @@ function isValidTypeIdentifier(name: string) {
 const specialScalarMethodToTypeMap = {
   datetime: "DateTime",
   timestamp: "Timestamp",
-  date: "Date"
+  date: "Date",
+  json: "JSON",
+  jsonobject: "JSONObject"
 } as const;
 
 const specialScalarTypes = new Set<string>(

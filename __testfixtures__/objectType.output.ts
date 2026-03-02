@@ -271,6 +271,18 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
       resolve: obj => obj.birthday
     }),
 
+    metadata: t.field({
+      type: "JSON",
+      nullable: true,
+      resolve: obj => obj.metadata
+    }),
+
+    settings: t.field({
+      type: "JSONObject",
+      nullable: false,
+      resolve: obj => obj.settings
+    }),
+
     randomDate: t.field({
       type: 'DateTime',
       nullable: false,
@@ -287,6 +299,18 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
       type: 'Date',
       nullable: true,
       resolve: obj => obj.nationalHoliday
+    }),
+
+    rawPayload: t.field({
+      type: 'JSON',
+      nullable: false,
+      resolve: obj => obj.rawPayload
+    }),
+
+    normalizedPayload: t.field({
+      type: 'JSONObject',
+      nullable: true,
+      resolve: obj => obj.normalizedPayload
     })
   })
 });
