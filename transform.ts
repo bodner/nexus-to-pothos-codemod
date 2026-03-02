@@ -1336,6 +1336,7 @@ const transform: Transform = (file, api) => {
               functionArguments.push(propertyName);
             }
           }
+          const shouldEmitNullable = !exposeName.startsWith("expose");
           const objectProps = [];
           let hasListTypeWrapper = false;
           let listItemRequired: boolean | null = null;
@@ -1370,7 +1371,7 @@ const transform: Transform = (file, api) => {
             objectProps.push(
               j.property("init", j.identifier("type"), finalType)
             );
-            if (hasList) {
+            if (hasList && shouldEmitNullable) {
               objectProps.push(
                 createFieldNullableProperty(
                   true,
@@ -1378,7 +1379,7 @@ const transform: Transform = (file, api) => {
                   listItemsNullable
                 )
               );
-            } else if (hasListTypeWrapper) {
+            } else if (hasListTypeWrapper && shouldEmitNullable) {
               const listNullableValue =
                 explicitTypeNullable ??
                 (hasOuterNonNull ? false : hasOuterNullable ? true : true);
@@ -1395,7 +1396,7 @@ const transform: Transform = (file, api) => {
               );
             }
           }
-          if (!hasList && !hasListTypeWrapper) {
+          if (!hasList && !hasListTypeWrapper && shouldEmitNullable) {
             const nullableValue =
               explicitTypeNullable !== null
                 ? explicitTypeNullable

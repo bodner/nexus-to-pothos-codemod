@@ -13,21 +13,12 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
   interfaces: [SomeType1],
 
   fields: t => ({
-    a: t.exposeID('a', {
-      nullable: false
-    }),
-
-    b: t.exposeFloat('b', {
-      nullable: false
-    }),
-
-    c: t.exposeFloat('c', {
-      nullable: true
-    }),
+    a: t.exposeID('a'),
+    b: t.exposeFloat('b'),
+    c: t.exposeFloat('c'),
 
     d: t.expose('d', {
-      type: SomeEnum,
-      nullable: true
+      type: SomeEnum
     }),
 
     e: t.string({
@@ -207,9 +198,7 @@ export const InputWithField = builder.inputType('InputWithField', {
 export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
   .implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId', {
-      nullable: false
-    }),
+    deviceId: t.exposeString('deviceId'),
 
     user: t.field({
       type: GraphQLUser,
@@ -230,9 +219,7 @@ export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser'
 export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
   .implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId', {
-      nullable: false
-    }),
+    deviceId: t.exposeString('deviceId'),
 
     user: t.field({
       type: GraphQLUser,
