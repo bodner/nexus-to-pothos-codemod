@@ -1092,6 +1092,79 @@ const transform: Transform = (file, api) => {
               } else {
                 return node;
               }
+
+              if (objectType === "inputType") {
+                const typeProperty = props.find(p => p.key?.name === "type");
+                if (!typeProperty) {
+                  return node;
+                }
+
+                const normalizedType = normalizeFieldType(
+                  typeProperty.value,
+                  hasList
+                );
+                typeProperty.value = normalizedType.type;
+
+                props = props.filter(p => p.key?.name !== "resolve");
+
+                if (normalizedType.hasList) {
+                  const listRequired = hasList ? !listNullable : true;
+                  const itemsRequired = hasList
+                    ? !listItemsNullable
+                    : !(normalizedType.required ?? true);
+
+                  props.unshift(
+                    j.property(
+                      "init",
+                      j.identifier("required"),
+                      j.objectExpression([
+                        j.property(
+                          "init",
+                          j.identifier("list"),
+                          j.booleanLiteral(listRequired)
+                        ),
+                        j.property(
+                          "init",
+                          j.identifier("items"),
+                          j.booleanLiteral(itemsRequired)
+                        )
+                      ])
+                    )
+                  );
+                } else {
+                  const requiredValue = hasOuterNullable
+                    ? false
+                    : hasOuterNonNull
+                      ? true
+                      : normalizedType.explicitNullable === true
+                        ? false
+                        : true;
+
+                  if (!requiredValue) {
+                    props.unshift(
+                      j.property(
+                        "init",
+                        j.identifier("required"),
+                        j.booleanLiteral(false)
+                      )
+                    );
+                  }
+                }
+
+                args.push(j.objectExpression(props));
+                return j.property(
+                  "init",
+                  j.identifier(name),
+                  j.callExpression(
+                    j.memberExpression(
+                      j.identifier("t"),
+                      j.identifier(transformedFunctionName)
+                    ),
+                    args
+                  )
+                );
+              }
+
               transformArgsPropertyIfPresent(props);
               props.unshift(
                 hasList
@@ -1126,16 +1199,54 @@ const transform: Transform = (file, api) => {
                   props.push(createDefaultResolver(name));
                 }
               }
+
+              if (objectType === "inputType") {
+                props = props.filter(p => p.key?.name !== "resolve");
+              }
+
               transformArgsPropertyIfPresent(props);
-              props.unshift(
-                hasList
-                  ? createFieldNullableProperty(
-                      true,
-                      listNullable,
-                      listItemsNullable
+
+              if (objectType === "inputType") {
+                const requiredProperty = hasList
+                  ? j.property(
+                      "init",
+                      j.identifier("required"),
+                      j.objectExpression([
+                        j.property(
+                          "init",
+                          j.identifier("list"),
+                          j.booleanLiteral(!listNullable)
+                        ),
+                        j.property(
+                          "init",
+                          j.identifier("items"),
+                          j.booleanLiteral(!listItemsNullable)
+                        )
+                      ])
                     )
-                  : createFieldNullableProperty(false, fieldNullable, false)
-              );
+                  : !fieldNullable
+                    ? null
+                    : j.property(
+                        "init",
+                        j.identifier("required"),
+                        j.booleanLiteral(false)
+                      );
+
+                if (requiredProperty) {
+                  props.unshift(requiredProperty);
+                }
+              } else {
+                props.unshift(
+                  hasList
+                    ? createFieldNullableProperty(
+                        true,
+                        listNullable,
+                        listItemsNullable
+                      )
+                    : createFieldNullableProperty(false, fieldNullable, false)
+                );
+              }
+
               args.push(j.objectExpression(props));
             } else {
               name = node.expression.arguments[0].value;

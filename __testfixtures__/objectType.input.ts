@@ -114,6 +114,11 @@ export const InputWithField = inputObjectType({
     t.field('departments', {
       type: list(nonNull(GraphQLEmployeeDepartmentOptionalInput))
     });
+
+    t.nonNull.list.nonNull.field('keywords', {
+      type: GraphQLRecordKeywordInput,
+      resolve: async (record) => null,
+    })
   }
 });
 

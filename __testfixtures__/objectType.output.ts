@@ -185,8 +185,21 @@ export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType'
 export const InputWithField = builder.inputType('InputWithField', {
   fields: t => ({
     departments: t.field({
-      nullable: false,
-      type: list(nonNull(GraphQLEmployeeDepartmentOptionalInput))
+      required: {
+        list: true,
+        items: false
+      },
+
+      type: [GraphQLEmployeeDepartmentOptionalInput]
+    }),
+
+    keywords: t.field({
+      required: {
+        list: true,
+        items: true
+      },
+
+      type: [GraphQLRecordKeywordInput]
     })
   })
 });
