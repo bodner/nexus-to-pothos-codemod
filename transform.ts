@@ -61,6 +61,27 @@ const transform: Transform = (file, api) => {
     return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
   };
 
+  const getPropertyKeyName = property => {
+    if (!property?.key) {
+      return null;
+    }
+    if (property.key.type === "Identifier") {
+      return property.key.name;
+    }
+    if (property.key.type === "StringLiteral") {
+      return property.key.value;
+    }
+    return null;
+  };
+
+  const renamePropertyKey = (properties, fromKey, toKey) => {
+    properties.forEach(property => {
+      if (getPropertyKeyName(property) === fromKey) {
+        property.key = j.identifier(toKey);
+      }
+    });
+  };
+
   const getBuilderImportSource = (sourceFilePath?: string) => {
     if (!sourceFilePath) {
       return "@/schema/builder.js";
@@ -308,6 +329,12 @@ const transform: Transform = (file, api) => {
             ? [...argConfig.properties]
             : [];
 
+        renamePropertyKey(
+          argConfigProperties,
+          "deprecation",
+          "deprecationReason"
+        );
+
         const typeProperty = argConfigProperties.find(
           property => property.key?.name === "type"
         );
@@ -548,6 +575,8 @@ const transform: Transform = (file, api) => {
     const configProps =
       configArg?.type === "ObjectExpression" ? [...configArg.properties] : [];
 
+    renamePropertyKey(configProps, "deprecation", "deprecationReason");
+
     const argsProperty = configProps.find(
       property => property.key?.name === "args"
     );
@@ -786,6 +815,7 @@ const transform: Transform = (file, api) => {
     }
     const name = args[0].value;
     const config = args[1];
+    renamePropertyKey(config.properties, "deprecation", "deprecationReason");
     const auth = config.properties.find(p => p.key.name === "authorize");
     if (auth) {
       auth.key.name = "authScopes";
@@ -926,6 +956,7 @@ const transform: Transform = (file, api) => {
     }
     const name = connectionFieldArguments[0].value;
     const config = connectionFieldArguments[1];
+    renamePropertyKey(config.properties, "deprecation", "deprecationReason");
     const typeProperty = config.properties.find(p => p.key.name === "type");
     if (!typeProperty) {
       return p.value;
@@ -1083,12 +1114,14 @@ const transform: Transform = (file, api) => {
                 props = fieldArgument.properties.filter(
                   p => p.key?.name !== "name"
                 );
+                renamePropertyKey(props, "deprecation", "deprecationReason");
               } else if (
                 fieldConfig?.type === "ObjectExpression" &&
                 fieldArgument?.type === "StringLiteral"
               ) {
                 name = fieldArgument.value;
                 props = [...fieldConfig.properties];
+                renamePropertyKey(props, "deprecation", "deprecationReason");
               } else {
                 return node;
               }
@@ -1180,7 +1213,8 @@ const transform: Transform = (file, api) => {
               node.expression.arguments[1]?.type === "ObjectExpression"
             ) {
               name = node.expression.arguments[0].value;
-              const props = [...node.expression.arguments[1].properties];
+              let props = [...node.expression.arguments[1].properties];
+              renamePropertyKey(props, "deprecation", "deprecationReason");
               const specialScalarType = getSpecialScalarTypeFromMethodName(
                 transformedFunctionName
               );

@@ -57,6 +57,9 @@ export const Input = inputObjectType({
     t.int('b');
     t.int('c');
     t.int('d');
+    t.nullable.id('legacyId', {
+      deprecation: 'Use formVersionId field instead!',
+    });
   }
 });
 

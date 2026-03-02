@@ -82,7 +82,12 @@ export const Input = builder.inputType('Input', {
     a: t.string(),
     b: t.int(),
     c: t.int(),
-    d: t.int()
+    d: t.int(),
+
+    legacyId: t.id({
+      required: false,
+      deprecationReason: 'Use formVersionId field instead!'
+    })
   })
 });
 
