@@ -360,3 +360,63 @@ export const ObjTypeWithNonNullDefaults = builder.objectRef<ObjTypeWithNonNullDe
     })
   })
 });
+
+export const InputWithScalars = builder.inputType('InputWithScalars', {
+  fields: t => ({
+    deviceId: t.string(),
+
+    hasPrivilege: t.boolean({
+      required: true
+    }),
+
+    createdAt: t.field({
+      type: "DateTime",
+      required: false
+    }),
+
+    lastSeenAt: t.field({
+      type: "Timestamp",
+      required: false
+    }),
+
+    birthday: t.field({
+      type: "Date",
+      required: true
+    }),
+
+    metadata: t.field({
+      type: "JSON",
+      required: false
+    }),
+
+    settings: t.field({
+      type: "JSONObject",
+      required: true
+    }),
+
+    randomDate: t.field({
+      required: true,
+      type: 'DateTime'
+    }),
+
+    processedAt: t.field({
+      required: false,
+      type: 'Timestamp'
+    }),
+
+    nationalHoliday: t.field({
+      required: false,
+      type: 'Date'
+    }),
+
+    rawPayload: t.field({
+      required: false,
+      type: 'JSON'
+    }),
+
+    normalizedPayload: t.field({
+      required: false,
+      type: 'JSONObject'
+    })
+  })
+});

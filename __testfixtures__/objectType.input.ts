@@ -208,3 +208,24 @@ export const ObjTypeWithNonNullDefaults = objectType({
     })
   }
 });
+
+export const InputWithScalars = inputObjectType({
+  name: 'InputWithScalars',
+  definition(t) {
+    t.string('deviceId');
+
+    t.nonNull.boolean('hasPrivilege')
+
+    t.nullable.datetime('createdAt')
+    t.nullable.timestamp('lastSeenAt')
+    t.nonNull.date('birthday')
+    t.nullable.json('metadata')
+    t.nonNull.jsonObject('settings')
+
+    t.nonNull.field('randomDate', {type: 'DateTime'})
+    t.field('processedAt', {type: 'Timestamp'})
+    t.nullable.field('nationalHoliday', {type: 'Date'})
+    t.field('rawPayload', {type: 'JSON'})
+    t.nullable.field('normalizedPayload', {type: 'JSONObject'})
+  }
+});

@@ -1184,17 +1184,17 @@ const transform: Transform = (file, api) => {
                       ? true
                       : normalizedType.explicitNullable === true
                         ? false
-                        : true;
+                        : normalizedType.explicitNullable === false
+                          ? true
+                          : false;
 
-                  if (!requiredValue) {
-                    props.unshift(
-                      j.property(
-                        "init",
-                        j.identifier("required"),
-                        j.booleanLiteral(false)
-                      )
-                    );
-                  }
+                  props.unshift(
+                    j.property(
+                      "init",
+                      j.identifier("required"),
+                      j.booleanLiteral(requiredValue)
+                    )
+                  );
                 }
 
                 args.push(j.objectExpression(props));
@@ -1271,13 +1271,15 @@ const transform: Transform = (file, api) => {
                         )
                       ])
                     )
-                  : !fieldNullable
-                    ? null
-                    : j.property(
+                  : transformedFunctionName === "field" ||
+                      hasOuterNonNull ||
+                      hasOuterNullable
+                    ? j.property(
                         "init",
                         j.identifier("required"),
-                        j.booleanLiteral(false)
-                      );
+                        j.booleanLiteral(hasOuterNonNull)
+                      )
+                    : null;
 
                 if (requiredProperty) {
                   props.unshift(requiredProperty);
@@ -1297,6 +1299,43 @@ const transform: Transform = (file, api) => {
               args.push(j.objectExpression(props));
             } else {
               name = node.expression.arguments[0].value;
+
+              if (objectType === "inputType") {
+                const specialScalarType = getSpecialScalarTypeFromMethodName(
+                  transformedFunctionName
+                );
+                const inputProps = [];
+
+                if (specialScalarType) {
+                  transformedFunctionName = "field";
+                  inputProps.push(
+                    j.property(
+                      "init",
+                      j.identifier("type"),
+                      j.stringLiteral(specialScalarType)
+                    )
+                  );
+                }
+
+                const shouldEmitRequired =
+                  Boolean(specialScalarType) ||
+                  hasOuterNonNull ||
+                  hasOuterNullable;
+
+                if (shouldEmitRequired) {
+                  inputProps.push(
+                    j.property(
+                      "init",
+                      j.identifier("required"),
+                      j.booleanLiteral(hasOuterNonNull)
+                    )
+                  );
+                }
+
+                if (inputProps.length) {
+                  args.push(j.objectExpression(inputProps));
+                }
+              }
             }
             return j.property(
               "init",
