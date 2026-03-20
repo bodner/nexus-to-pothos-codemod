@@ -4,6 +4,7 @@ import {
   DeviceWithNullableUser,
   DeviceWithUser,
   ListObjectType,
+  ObjTypeWithNonNullDefaults,
   RandomObjectType,
   SomeObjectType,
 } from "@prisma/client";
@@ -316,6 +317,46 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
       type: 'JSONObject',
       nullable: true,
       resolve: obj => obj.normalizedPayload
+    })
+  })
+});
+
+export const ObjTypeWithNonNullDefaults = builder.objectRef<ObjTypeWithNonNullDefaults>('ObjTypeWithNonNullDefaults')
+  .implement({
+  fields: t => ({
+    x: t.booleanList({
+      nullable: {
+        list: true,
+        items: true
+      },
+
+      resolve: () => [true, null, false]
+    }),
+
+    y: t.stringList({
+      nullable: {
+        list: false,
+        items: true
+      },
+
+      resolve: () => ['a', null, 'b']
+    }),
+
+    z: t.field({
+      type: [SomeRandomType],
+
+      nullable: {
+        list: false,
+        items: true
+      },
+
+      resolve: () => [new SomeRandomType(), new SomeRandomType()]
+    }),
+
+    a: t.field({
+      type: XYZ,
+      nullable: false,
+      resolve: () => ({})
     })
   })
 });

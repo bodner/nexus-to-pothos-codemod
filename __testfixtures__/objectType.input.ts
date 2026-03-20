@@ -185,3 +185,26 @@ export const DeviceWithNullableUser = objectType({
 
   }
 });
+
+export const ObjTypeWithNonNullDefaults = objectType({
+  name: 'ObjTypeWithNonNullDefaults',
+  nonNullDefaults: {
+    output: true,
+  },
+  definition(t) {
+    t.nullable.list.boolean('x', {
+      resolve: () => [true, null, false]
+    });
+    t.nonNull.list.nullable.string('y', {
+      resolve: () => ['a', null, 'b']
+    });
+    t.list.field('z', {
+      type: SomeRandomType,
+      resolve: () => [new SomeRandomType(), new SomeRandomType()]
+    });
+    t.field('a', {
+      type: XYZ,
+      resolve: () => ({})
+    })
+  }
+});

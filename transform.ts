@@ -1041,6 +1041,19 @@ const transform: Transform = (file, api) => {
     const type = object.properties.find(p => p.key.name === "name").value;
     const definitions = object.properties.find(p => p.key.name === "definition")
       .body.body;
+    const nonNullDefaultsProperty = object.properties.find(
+      p => p.key?.name === "nonNullDefaults"
+    );
+    const nonNullDefaultsOutput =
+      nonNullDefaultsProperty?.value?.type === "ObjectExpression"
+        ? nonNullDefaultsProperty.value.properties.find(
+            property => property.key?.name === "output"
+          )
+        : null;
+    const outputListNonNullByDefault =
+      nonNullDefaultsOutput?.value?.type === "BooleanLiteral"
+        ? nonNullDefaultsOutput.value.value
+        : false;
     const resolveType = object.properties.find(
       p => p.key.name === "resolveType"
     );
@@ -1077,7 +1090,7 @@ const transform: Transform = (file, api) => {
             ? false
             : hasOuterNullable
               ? true
-              : true;
+              : !outputListNonNullByDefault;
           const listItemsNullable = hasInnerNonNull
             ? false
             : hasInnerNullable
@@ -1416,7 +1429,11 @@ const transform: Transform = (file, api) => {
             } else if (hasListTypeWrapper && shouldEmitNullable) {
               const listNullableValue =
                 explicitTypeNullable ??
-                (hasOuterNonNull ? false : hasOuterNullable ? true : true);
+                (hasOuterNonNull
+                  ? false
+                  : hasOuterNullable
+                    ? true
+                    : !outputListNonNullByDefault);
               const listItemsNullableValue =
                 typeof listItemRequired === "boolean"
                   ? !listItemRequired
