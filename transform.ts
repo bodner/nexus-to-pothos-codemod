@@ -1556,18 +1556,15 @@ const transform: Transform = (file, api) => {
     if (objectType === "inputType") {
       return statement`builder.${objectType}(${type}, ${j.objectExpression(objectProps)})`;
     }
-    const refStatement = statement`builder.${objectType}<any>(${type})
-  .implement(${j.objectExpression(objectProps)})`;
+    const refExpression = j.template
+      .expression`builder.${objectType}<any>(${type})`;
     if (type.type === "StringLiteral" && isValidTypeIdentifier(type.value)) {
-      const implementCall = refStatement.expression;
+      const refCall = refExpression;
       if (
-        implementCall?.type === "CallExpression" &&
-        implementCall.callee.type === "MemberExpression" &&
-        implementCall.callee.object.type === "CallExpression" &&
-        implementCall.callee.object.typeParameters?.type ===
-          "TSTypeParameterInstantiation"
+        refCall?.type === "CallExpression" &&
+        refCall.typeParameters?.type === "TSTypeParameterInstantiation"
       ) {
-        implementCall.callee.object.typeParameters.params = [
+        refCall.typeParameters.params = [
           j.tsTypeReference(j.identifier(type.value))
         ];
         if (objectType === "objectRef") {
@@ -1575,7 +1572,44 @@ const transform: Transform = (file, api) => {
         }
       }
     }
-    return refStatement;
+
+    const variableName =
+      p.parentPath?.value?.type === "VariableDeclarator" &&
+      p.parentPath.value.id?.type === "Identifier"
+        ? p.parentPath.value.id.name
+        : null;
+    const hasNamedVariableParent =
+      p.parentPath?.value?.type === "VariableDeclarator" &&
+      p.parentPath.value.id?.type === "Identifier";
+
+    if (hasNamedVariableParent) {
+      const implementStatement = j.expressionStatement(
+        j.callExpression(
+          j.memberExpression(
+            j.identifier(variableName),
+            j.identifier("implement")
+          ),
+          [j.objectExpression(objectProps)]
+        )
+      );
+
+      const exportDeclaration = j(p).closest(j.ExportNamedDeclaration);
+      if (exportDeclaration.size() > 0) {
+        exportDeclaration.at(0).insertAfter(implementStatement);
+        return refExpression;
+      }
+
+      const variableDeclaration = j(p).closest(j.VariableDeclaration);
+      if (variableDeclaration.size() > 0) {
+        variableDeclaration.at(0).insertAfter(implementStatement);
+        return refExpression;
+      }
+    }
+
+    return j.callExpression(
+      j.memberExpression(refExpression, j.identifier("implement")),
+      [j.objectExpression(objectProps)]
+    );
   });
 
   const usesBuilder =

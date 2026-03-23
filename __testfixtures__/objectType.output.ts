@@ -9,8 +9,9 @@ import {
   SomeObjectType,
 } from "@prisma/client";
 
-export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType')
-  .implement({
+export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType');
+
+SomeObjectType.implement({
   interfaces: [SomeType1],
 
   fields: t => ({
@@ -57,8 +58,9 @@ export const SomeObjectType = builder.objectRef<SomeObjectType>('SomeObjectType'
   })
 });
 
-export const Interface = builder.interfaceRef<SomeType1>('SomeType1')
-  .implement({
+export const Interface = builder.interfaceRef<SomeType1>('SomeType1');
+
+Interface.implement({
   fields: t => ({
     id: t.id(),
     stringField: t.string(),
@@ -92,8 +94,9 @@ export const Input = builder.inputType('Input', {
   })
 });
 
-export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjectType')
-  .implement({
+export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjectType');
+
+RandomObjectType.implement({
   fields: t => ({
     listOfNullableBooleans: t.booleanList({
       nullable: {
@@ -126,8 +129,9 @@ export const RandomObjectType = builder.objectRef<RandomObjectType>('RandomObjec
   })
 });
 
-export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType')
-  .implement({
+export const ListObjectType = builder.objectRef<ListObjectType>('ListObjectType');
+
+ListObjectType.implement({
   fields: t => ({
     departments: t.field({
       type: [GraphQLDepartment],
@@ -201,8 +205,9 @@ export const InputWithField = builder.inputType('InputWithField', {
   })
 });
 
-export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser')
-  .implement({
+export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser');
+
+DeviceWithUser.implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId'),
 
@@ -222,8 +227,9 @@ export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser'
   })
 });
 
-export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser')
-  .implement({
+export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>('DeviceWithNullableUser');
+
+DeviceWithNullableUser.implement({
   fields: t => ({
     deviceId: t.exposeString('deviceId'),
 
@@ -321,8 +327,9 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
   })
 });
 
-export const ObjTypeWithNonNullDefaults = builder.objectRef<ObjTypeWithNonNullDefaults>('ObjTypeWithNonNullDefaults')
-  .implement({
+export const ObjTypeWithNonNullDefaults = builder.objectRef<ObjTypeWithNonNullDefaults>('ObjTypeWithNonNullDefaults');
+
+ObjTypeWithNonNullDefaults.implement({
   fields: t => ({
     x: t.booleanList({
       nullable: {
