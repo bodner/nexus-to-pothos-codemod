@@ -1,4 +1,4 @@
-import { builder } from "@/schema/builder.js";
+import { builder } from "@/schema/index.js";
 export const relayList = builder.queryField("relayList", t => t.connection({
   type: SomeType,
   nullable: false,
