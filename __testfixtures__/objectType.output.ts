@@ -4,6 +4,7 @@ import {
   DeviceWithNullableUser,
   DeviceWithUser,
   ListObjectType,
+  ObjTypeWithMoreDefaults,
   ObjTypeWithNonNullDefaults,
   RandomObjectType,
   SomeObjectType,
@@ -424,6 +425,81 @@ export const InputWithScalars = builder.inputType('InputWithScalars', {
     normalizedPayload: t.field({
       required: false,
       type: 'JSONObject'
+    })
+  })
+});
+
+export const InputWithDefaults = builder.inputType('InputWithDefaults', {
+  fields: t => ({
+    a: t.string({
+      required: true
+    }),
+
+    b: t.field({
+      type: "DateTime",
+      required: true
+    }),
+
+    c: t.field({
+      type: "DateTime",
+      required: true
+    }),
+
+    d: t.field({
+      type: "DateTime",
+      required: false
+    }),
+
+    e: t.field({
+      type: "Timestamp",
+      required: false
+    }),
+
+    f: t.stringList({
+      required: {
+        list: true,
+        items: true
+      }
+    }),
+
+    g: t.stringList({
+      required: {
+        list: true,
+        items: false
+      }
+    }),
+
+    h: t.stringList({
+      required: {
+        list: false,
+        items: true
+      }
+    }),
+
+    i: t.field({
+      required: {
+        list: false,
+        items: true
+      },
+
+      type: [SomeRandomType]
+    })
+  })
+});
+
+export const ObjTypeWithMoreDefaults = builder.objectRef<ObjTypeWithMoreDefaults>('ObjTypeWithMoreDefaults')
+
+ObjTypeWithMoreDefaults.implement({
+  fields: t => ({
+    departments: t.field({
+      type: [GraphQLDepartment],
+
+      nullable: {
+        list: false,
+        items: false
+      },
+
+      resolve: async (costCenter) => {}
     })
   })
 });

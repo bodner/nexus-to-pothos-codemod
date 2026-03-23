@@ -229,3 +229,39 @@ export const InputWithScalars = inputObjectType({
     t.nullable.field('normalizedPayload', {type: 'JSONObject'})
   }
 });
+
+export const InputWithDefaults = inputObjectType({
+  name: 'InputWithDefaults',
+  nonNullDefaults: {
+    input: true,
+  },
+  definition(t) {
+    t.string('a');
+
+    t.datetime('b')
+    t.nonNull.datetime('c')
+    t.nullable.datetime('d')
+    t.nullable.timestamp('e')
+
+    t.list.nonNull.string('f')
+    t.list.string('g')
+
+    t.nullable.list.nonNull.string('h')
+
+    t.nullable.list.field('i', {
+      type: nonNull(SomeRandomType),
+    })
+  }
+});
+
+export const ObjTypeWithMoreDefaults = objectType({
+  name: 'ObjTypeWithMoreDefaults',
+  nonNullDefaults: {
+    output: true,
+  },
+  definition(t) {
+    t.list.field('departments', {
+      type: nonNull(GraphQLDepartment),
+      resolve: async (costCenter) => {},
+    })
+  }})

@@ -1050,9 +1050,19 @@ const transform: Transform = (file, api) => {
             property => property.key?.name === "output"
           )
         : null;
+    const nonNullDefaultsInput =
+      nonNullDefaultsProperty?.value?.type === "ObjectExpression"
+        ? nonNullDefaultsProperty.value.properties.find(
+            property => property.key?.name === "input"
+          )
+        : null;
     const outputListNonNullByDefault =
       nonNullDefaultsOutput?.value?.type === "BooleanLiteral"
         ? nonNullDefaultsOutput.value.value
+        : false;
+    const inputNonNullByDefault =
+      nonNullDefaultsInput?.value?.type === "BooleanLiteral"
+        ? nonNullDefaultsInput.value.value
         : false;
     const resolveType = object.properties.find(
       p => p.key.name === "resolveType"
@@ -1086,16 +1096,22 @@ const transform: Transform = (file, api) => {
             : hasOuterNullable
               ? true
               : false;
+          const listNullableByDefault =
+            objectType === "inputType"
+              ? !inputNonNullByDefault
+              : !outputListNonNullByDefault;
+          const listItemsNullableByDefault =
+            objectType === "inputType" ? !inputNonNullByDefault : true;
           const listNullable = hasOuterNonNull
             ? false
             : hasOuterNullable
               ? true
-              : !outputListNonNullByDefault;
+              : listNullableByDefault;
           const listItemsNullable = hasInnerNonNull
             ? false
             : hasInnerNullable
               ? true
-              : true;
+              : listItemsNullableByDefault;
           if (functionName === "implements") {
             implementsInterfaces.push(node.expression.arguments[0].name);
             return null;
@@ -1156,7 +1172,15 @@ const transform: Transform = (file, api) => {
                 if (normalizedType.hasList) {
                   const listRequired = hasList ? !listNullable : true;
                   const itemsRequired = hasList
-                    ? !listItemsNullable
+                    ? hasInnerNonNull
+                      ? true
+                      : hasInnerNullable
+                        ? false
+                        : normalizedType.explicitNullable === false
+                          ? true
+                          : normalizedType.explicitNullable === true
+                            ? false
+                            : !listItemsNullable
                     : !(normalizedType.required ?? true);
 
                   props.unshift(
@@ -1186,7 +1210,7 @@ const transform: Transform = (file, api) => {
                         ? false
                         : normalizedType.explicitNullable === false
                           ? true
-                          : false;
+                          : inputNonNullByDefault;
 
                   props.unshift(
                     j.property(
@@ -1272,12 +1296,19 @@ const transform: Transform = (file, api) => {
                       ])
                     )
                   : transformedFunctionName === "field" ||
+                      inputNonNullByDefault ||
                       hasOuterNonNull ||
                       hasOuterNullable
                     ? j.property(
                         "init",
                         j.identifier("required"),
-                        j.booleanLiteral(hasOuterNonNull)
+                        j.booleanLiteral(
+                          hasOuterNullable
+                            ? false
+                            : hasOuterNonNull
+                              ? true
+                              : inputNonNullByDefault
+                        )
                       )
                     : null;
 
@@ -1319,17 +1350,56 @@ const transform: Transform = (file, api) => {
 
                 const shouldEmitRequired =
                   Boolean(specialScalarType) ||
+                  inputNonNullByDefault ||
+                  hasList ||
                   hasOuterNonNull ||
                   hasOuterNullable;
 
                 if (shouldEmitRequired) {
-                  inputProps.push(
-                    j.property(
-                      "init",
-                      j.identifier("required"),
-                      j.booleanLiteral(hasOuterNonNull)
-                    )
-                  );
+                  if (hasList) {
+                    const listRequired = hasOuterNullable
+                      ? false
+                      : hasOuterNonNull
+                        ? true
+                        : inputNonNullByDefault;
+                    const itemsRequired = hasInnerNonNull
+                      ? true
+                      : hasInnerNullable
+                        ? false
+                        : false;
+                    inputProps.push(
+                      j.property(
+                        "init",
+                        j.identifier("required"),
+                        j.objectExpression([
+                          j.property(
+                            "init",
+                            j.identifier("list"),
+                            j.booleanLiteral(listRequired)
+                          ),
+                          j.property(
+                            "init",
+                            j.identifier("items"),
+                            j.booleanLiteral(itemsRequired)
+                          )
+                        ])
+                      )
+                    );
+                  } else {
+                    inputProps.push(
+                      j.property(
+                        "init",
+                        j.identifier("required"),
+                        j.booleanLiteral(
+                          hasOuterNullable
+                            ? false
+                            : hasOuterNonNull
+                              ? true
+                              : inputNonNullByDefault
+                        )
+                      )
+                    );
+                  }
                 }
 
                 if (inputProps.length) {
@@ -1458,11 +1528,18 @@ const transform: Transform = (file, api) => {
               j.property("init", j.identifier("type"), finalType)
             );
             if (hasList && shouldEmitNullable) {
+              const listItemsNullableValue = hasInnerNonNull
+                ? false
+                : hasInnerNullable
+                  ? true
+                  : explicitTypeNullable !== null
+                    ? explicitTypeNullable
+                    : listItemsNullable;
               objectProps.push(
                 createFieldNullableProperty(
                   true,
                   listNullable,
-                  listItemsNullable
+                  listItemsNullableValue
                 )
               );
             } else if (hasListTypeWrapper && shouldEmitNullable) {
