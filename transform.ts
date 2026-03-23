@@ -1090,12 +1090,18 @@ const transform: Transform = (file, api) => {
           const hasOuterNullable = outerWrappers.includes("nullable");
           const hasInnerNonNull = innerWrappers.includes("nonNull");
           const hasInnerNullable = innerWrappers.includes("nullable");
+          const isSpecialScalarMethodCall = Boolean(
+            functionName !== "field" &&
+              getSpecialScalarTypeFromMethodName(functionName)
+          );
 
           const fieldNullable = hasOuterNonNull
             ? false
             : hasOuterNullable
               ? true
-              : false;
+              : isSpecialScalarMethodCall
+                ? !outputListNonNullByDefault
+                : false;
           const listNullableByDefault =
             objectType === "inputType"
               ? !inputNonNullByDefault

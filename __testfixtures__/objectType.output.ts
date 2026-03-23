@@ -1,8 +1,9 @@
-import { builder } from "@/schema/builder.js";
+import { builder } from "@/schema/index.js";
 
 import {
   DeviceWithNullableUser,
   DeviceWithUser,
+  EasyObject,
   ListObjectType,
   ObjTypeWithMoreDefaults,
   ObjTypeWithNonNullDefaults,
@@ -501,5 +502,19 @@ ObjTypeWithMoreDefaults.implement({
 
       resolve: async (costCenter) => {}
     })
+  })
+});
+
+export const EasyObject = builder.objectRef<EasyObject>('EasyObject')
+
+EasyObject.implement({
+  fields: t => ({
+    orderDate: t.field({
+      type: "Date",
+      nullable: true,
+      resolve: obj => obj.orderDate
+    }),
+
+    x: t.exposeInt('x')
   })
 });

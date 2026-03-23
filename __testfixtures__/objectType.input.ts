@@ -265,3 +265,11 @@ export const ObjTypeWithMoreDefaults = objectType({
       resolve: async (costCenter) => {},
     })
   }})
+
+export const EasyObject = objectType({
+  name: 'EasyObject',
+  definition(t) {
+    t.date('orderDate')
+
+    t.int('x')
+  }})

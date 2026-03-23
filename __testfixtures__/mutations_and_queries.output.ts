@@ -1,4 +1,4 @@
-import { builder } from "@/schema/builder.js";
+import { builder } from "@/schema/index.js";
 export const doThings = builder.mutationField("doThings", t => t.field({
   type: SomeType,
   nullable: false,
