@@ -84,7 +84,7 @@ const transform: Transform = (file, api) => {
 
   const getBuilderImportSource = (sourceFilePath?: string) => {
     if (!sourceFilePath) {
-      return "@/schema/builder.js";
+      return "@/schema/index.js";
     }
 
     const normalizedSourcePath = toPosixPath(path.resolve(sourceFilePath));
@@ -92,14 +92,14 @@ const transform: Transform = (file, api) => {
     const apiSrcIndex = normalizedSourcePath.lastIndexOf(apiSrcMarker);
 
     if (apiSrcIndex < 0) {
-      return "@/schema/builder.js";
+      return "@/schema/index.js";
     }
 
     const apiSrcRoot = normalizedSourcePath.slice(
       0,
       apiSrcIndex + apiSrcMarker.length - 1
     );
-    const builderFilePath = `${apiSrcRoot}/schema/builder.js`;
+    const builderFilePath = `${apiSrcRoot}/schema/index.js`;
 
     return toRelativeImportPath(normalizedSourcePath, builderFilePath);
   };
