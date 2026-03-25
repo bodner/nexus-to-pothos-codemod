@@ -1,0 +1,8 @@
+input FileFilterInput {
+  fileIdsStrict: [ID!]!
+  fileIdsNullableList: [ID!]
+  fileIdsNullableItems: [ID]!
+  plainText: String!
+  optionalNote: String
+  customIds: [ID]
+}

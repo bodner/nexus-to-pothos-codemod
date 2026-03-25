@@ -1,0 +1,16 @@
+type ItRequestForm {
+  active: Boolean
+  createdAt: Timestamp
+  departmentIds: [ID!]!
+  description: String
+  fileIdsListNonNullItems: [ID!]
+  fileIdsNonNullListNullableItems: [ID]!
+  fileIds: [ID!]!
+  id: ID
+  predecessor: ItRequestForm
+  predecessorCount: Int!
+  referenceId: ID
+  requirementGroups: [ItRequestRequirementGroup]!
+  successor: ItRequestForm
+  updatedAt: Timestamp
+}

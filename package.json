@@ -29,6 +29,7 @@
   "dependencies": {
     "execa": "9.5.3",
     "jscodeshift": "^17.3.0",
+    "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {

@@ -264,6 +264,10 @@ export const ObjTypeWithMoreDefaults = objectType({
       type: nonNull(GraphQLDepartment),
       resolve: async (costCenter) => {},
     })
+
+    t.int('x')
+
+    t.nullable.int('y')
   }})
 
 export const EasyObject = objectType({
@@ -271,5 +275,11 @@ export const EasyObject = objectType({
   definition(t) {
     t.date('orderDate')
 
+    t.float('price', {
+      resolve: () => 1,
+    })
+
     t.int('x')
+
+    t.nonNull.int('y')
   }})

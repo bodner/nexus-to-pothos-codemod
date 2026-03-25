@@ -17,12 +17,21 @@ SomeObjectType.implement({
   interfaces: [SomeType1],
 
   fields: t => ({
-    a: t.exposeID('a'),
-    b: t.exposeFloat('b'),
-    c: t.exposeFloat('c'),
+    a: t.exposeID('a', {
+      nullable: true
+    }),
+
+    b: t.exposeFloat('b', {
+      nullable: true
+    }),
+
+    c: t.exposeFloat('c', {
+      nullable: true
+    }),
 
     d: t.expose('d', {
-      type: SomeEnum
+      type: SomeEnum,
+      nullable: true
     }),
 
     e: t.string({
@@ -35,7 +44,7 @@ SomeObjectType.implement({
 
     f: t.field({
       type: SomeType,
-      nullable: false,
+      nullable: true,
 
       async resolve(rootObject: any, args, ctx) {
         return ctx.smthng();
@@ -43,7 +52,7 @@ SomeObjectType.implement({
     }),
 
     g: t.float({
-      nullable: false,
+      nullable: true,
       resolve: () => 1
     }),
 
@@ -68,7 +77,7 @@ Interface.implement({
     stringField: t.string(),
 
     resolvableField: t.field({
-      nullable: false,
+      nullable: true,
       type: SomeType2,
 
       async resolve(rootObject, args, ctx) {
@@ -211,7 +220,9 @@ export const DeviceWithUser = builder.objectRef<DeviceWithUser>('DeviceWithUser'
 
 DeviceWithUser.implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId'),
+    deviceId: t.exposeString('deviceId', {
+      nullable: true
+    }),
 
     user: t.field({
       type: GraphQLUser,
@@ -233,7 +244,9 @@ export const DeviceWithNullableUser = builder.objectRef<DeviceWithNullableUser>(
 
 DeviceWithNullableUser.implement({
   fields: t => ({
-    deviceId: t.exposeString('deviceId'),
+    deviceId: t.exposeString('deviceId', {
+      nullable: true
+    }),
 
     user: t.field({
       type: GraphQLUser,
@@ -305,7 +318,7 @@ DeviceWithNullableUser.implement({
 
     processedAt: t.field({
       type: 'Timestamp',
-      nullable: false,
+      nullable: true,
       resolve: obj => obj.processedAt
     }),
 
@@ -317,7 +330,7 @@ DeviceWithNullableUser.implement({
 
     rawPayload: t.field({
       type: 'JSON',
-      nullable: false,
+      nullable: true,
       resolve: obj => obj.rawPayload
     }),
 
@@ -501,6 +514,14 @@ ObjTypeWithMoreDefaults.implement({
       },
 
       resolve: async (costCenter) => {}
+    }),
+
+    x: t.exposeInt('x', {
+      nullable: false
+    }),
+
+    y: t.exposeInt('y', {
+      nullable: true
     })
   })
 });
@@ -515,6 +536,17 @@ EasyObject.implement({
       resolve: obj => obj.orderDate
     }),
 
-    x: t.exposeInt('x')
+    price: t.float({
+      nullable: true,
+      resolve: () => 1
+    }),
+
+    x: t.exposeInt('x', {
+      nullable: true
+    }),
+
+    y: t.exposeInt('y', {
+      nullable: false
+    })
   })
 });

@@ -1090,18 +1090,13 @@ const transform: Transform = (file, api) => {
           const hasOuterNullable = outerWrappers.includes("nullable");
           const hasInnerNonNull = innerWrappers.includes("nonNull");
           const hasInnerNullable = innerWrappers.includes("nullable");
-          const isSpecialScalarMethodCall = Boolean(
-            functionName !== "field" &&
-              getSpecialScalarTypeFromMethodName(functionName)
-          );
-
           const fieldNullable = hasOuterNonNull
             ? false
             : hasOuterNullable
               ? true
-              : isSpecialScalarMethodCall
-                ? !outputListNonNullByDefault
-                : false;
+              : objectType === "inputType"
+                ? false
+                : !outputListNonNullByDefault;
           const listNullableByDefault =
             objectType === "inputType"
               ? !inputNonNullByDefault
@@ -1498,7 +1493,7 @@ const transform: Transform = (file, api) => {
               functionArguments.push(propertyName);
             }
           }
-          const shouldEmitNullable = !exposeName.startsWith("expose");
+          const shouldEmitNullable = true;
           const objectProps = [];
           let hasListTypeWrapper = false;
           let listItemRequired: boolean | null = null;
